@@ -1,0 +1,146 @@
+/* Table formatting*/ 
+table { border-collapse: collapse; margin:10px 0; background-color: white; margin-left: auto; margin-right: auto; }
+  th, td { border:1px solid #444; padding:5px 10px; text-align:center; }
+  th { background: white; }
+  .zone-tables { display:flex; gap:40px; flex-wrap:wrap; }
+
+/* Background colour and width setting*/
+body {
+background-color: lightgrey;
+font-family: Open-Sans;
+}
+
+main {
+max-width: 1300px;
+margin: 0 auto;
+padding: 2rem;
+}
+
+section {
+  background: #fff;
+  padding: 1.5rem;
+  margin-bottom: 2rem;
+  border-radius: 8px;
+  box-shadow: 0 2px 6px rgba(0,0,0,0,0.08);
+}
+
+/* whole document text alignment*/
+body {
+text-align: center;
+color: black;
+}
+ul {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  text-align: center;
+}
+/* Main title font selection*/
+h1, h2, h3 {
+font-family: san-serif;
+}
+
+/* Paragrapgh styling*/
+.description {
+font-style: italic;
+}
+
+/* Page break styling*/
+hr {
+height: 2px;
+background-color: silver;
+border-color: black;
+}
+
+/* Button Styling*/
+input, select, button {
+background: thistle;
+color: black;
+border-color: rgb(83, 69, 59);
+padding:0.5rem 0.75rem;
+border-radius: 6px;
+border: 1px solid #ccc;
+font-size: 1rem;
+display: inline-block;
+vertical-align: middle;
+}
+input:focus, select:focus {
+  border-color: #fc2e2e;
+  outline: none;
+  box-shadow: 0 0 4px rgba(0,119,204,0.3);
+}
+
+/* link styling*/
+a {
+color: black;
+}
+a:visited {
+color: yellow;
+}
+a:hover {
+color: lime;
+}
+
+/* Sort out styling of sesison graphs*/
+.session-graph {
+background-color: rgb(236, 232, 232);
+border: 2px solid black;
+padding: 5px;
+}
+
+/* Nav styling */
+nav {
+  background: thistle;
+  padding: 0.5rem 1rem;
+}
+
+nav ul {
+  list-style: none;
+  display: flex;
+  gap: 1rem;
+  margin: 0;
+  padding: 0;
+}
+
+/* Reset list style */
+nav ul {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;              /* horizontal layout */
+  gap: 1.5rem;                /* space between links */
+  justify-content: center;    /* center the nav */
+}
+
+/* Nav container */
+nav {
+  background: thistle;           /* dark background */
+  padding: 0.75rem 1.5rem;
+  position: sticky;           /* stays at top when scrolling */
+  top: 0;
+  z-index: 1000;
+}
+
+/* Links */
+nav a {
+  color: #fff;                /* white text */
+  text-decoration: none;
+  font-weight: 500;
+  font-size: 3rem;
+  transition: color 0.3s, border-bottom 0.3s;
+  padding-bottom: 0.25rem;
+}
+
+/* Hover effect */
+nav a:hover {
+  color: #4db8ff;             /* accent colour */
+  border-bottom: 2px solid #4db8ff;
+}
+
+/* Active link (optional) */
+nav a.active {
+  color: #4db8ff;
+  border-bottom: 2px solid #4db8ff;
+}
+
+
