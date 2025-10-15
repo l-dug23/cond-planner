@@ -1076,4 +1076,73 @@ if (runPdfBtn) {
         });
     }
   }
+// === SAVE / RECALL ATHLETE DATA for CS (Running) Form ===
+const saveRunButton = document.getElementById("save-runner");
+const runSelect = document.getElementById("runner-select");
+
+
+if (saveRunButton && runSelect && csForm) {
+  updateRunnerList();
+
+  // Save runner data
+  saveRunButton.addEventListener("click", e => {
+    e.preventDefault();
+    const name = csForm.querySelector("#cs-name").value.trim();
+    if (!name) {
+      alert("Please enter a name before saving.");
+      return;
+    }
+
+    const formData = { name };
+
+    // Save all pace inputs
+    ["1km", "3km", "5km", "10km"].forEach(id => {
+      formData[id] = csForm.querySelector(`[id='${id}']`).value;
+    });
+
+    // Save model (2P or 3P)
+    const modelRadio = csForm.querySelector("input[name='Model']:checked");
+    formData.model = modelRadio ? modelRadio.value : "";
+
+    // Save to localStorage
+    localStorage.setItem(`runner_${name}`, JSON.stringify(formData));
+    alert(`Saved data for ${name}`);
+
+    updateRunnerList();
+    runSelect.value = name;
+  });
+
+  // Load runner data when selected
+  runSelect.addEventListener("change", () => {
+    const selected = runSelect.value;
+    if (!selected) return;
+
+    const data = JSON.parse(localStorage.getItem(`runner_${selected}`));
+    if (!data) return;
+
+    csForm.querySelector("#cs-name").value = data.name || "";
+    ["1km", "3km", "5km", "10km"].forEach(id => {
+      if (data[id] !== undefined) csForm.querySelector(`[id='${id}']`).value = data[id];
+    });
+
+    const modelRadio = csForm.querySelector(`input[value='${data.model}']`);
+    if (modelRadio) modelRadio.checked = true;
+  });
+
+  // Build dropdown from saved runners
+  function updateRunnerList() {
+    runSelect.innerHTML = "<option value=''>Select runner</option>";
+    Object.keys(localStorage)
+      .filter(key => key.startsWith("runner_"))
+      .forEach(key => {
+        const name = key.replace("runner_", "");
+        const opt = document.createElement("option");
+        opt.value = name;
+        opt.textContent = name;
+        runSelect.appendChild(opt);
+      });
+  }
+}
+
+
 });
