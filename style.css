@@ -186,3 +186,15 @@ nav ul li .dropdown-content a:hover {
 nav ul li.dropdown:hover .dropdown-content {
   display: block;
 }
+
+figure {
+  margin: 2em 0;
+  text-align: center;
+}
+
+figcaption {
+  font-size: 0.9em;
+  font-style: italic;
+  color: #555;
+  margin-top: 0.5em;
+}
