@@ -886,60 +886,67 @@ y += 10;
       doc.save("Cycling_Report.pdf");
     });
   }
-  // === PDF Export for Running ===
+ // === PDF Export for Running ===
 const runPdfBtn = document.getElementById("download-run-pdf");
 if (runPdfBtn) {
   runPdfBtn.addEventListener("click", async () => {
     const { jsPDF } = window.jspdf;
     const doc = new jsPDF("p", "mm", "a4");
 
+    // Header
     doc.setFontSize(18);
-    doc.text("Running Conditioning Analysis Report", 14, 20);
+    const name = document.getElementById("cs-name")?.value || "Athlete";
+    doc.text(`Running Conditioning Report — ${name}`, 14, 20);
 
     let y = 30;
 
-    // Collect results
-    const resultsHtml = document.getElementById("run-results").innerHTML;
-    const tempDiv = document.createElement("div");
-    tempDiv.innerHTML = resultsHtml;
+    // === Results Section ===
+    const resultsEl = document.getElementById("run-results");
+    if (resultsEl && resultsEl.innerHTML.trim() !== "") {
+      const tempDiv = document.createElement("div");
+      tempDiv.innerHTML = resultsEl.innerHTML;
 
-    Array.from(tempDiv.querySelectorAll("p, h3, table")).forEach(el => {
-      if (el.tagName === "P" || el.tagName === "H3") {
-        doc.setFontSize(el.tagName === "H3" ? 14 : 11);
-        doc.text(el.innerText, 14, y);
-        y += 8;
-      } else if (el.tagName === "TABLE") {
-        const rows = Array.from(el.querySelectorAll("tr")).map(tr =>
-          Array.from(tr.querySelectorAll("td,th")).map(td => td.innerText)
-        );
-        doc.autoTable({ head: [rows[0]], body: rows.slice(1), startY: y });
-        y = doc.lastAutoTable.finalY + 10;
-      }
-    });
+      Array.from(tempDiv.querySelectorAll("p, h3, table")).forEach(el => {
+        if (el.tagName === "P" || el.tagName === "H3") {
+          doc.setFontSize(el.tagName === "H3" ? 14 : 11);
+          doc.text(el.innerText, 14, y);
+          y += 8;
+        } else if (el.tagName === "TABLE") {
+          const rows = Array.from(el.querySelectorAll("tr")).map(tr =>
+            Array.from(tr.querySelectorAll("td,th")).map(td => td.innerText)
+          );
+          doc.autoTable({ head: [rows[0]], body: rows.slice(1), startY: y });
+          y = doc.lastAutoTable.finalY + 10;
+        }
+      });
+    } else {
+      doc.text("No running results generated yet.", 14, y);
+      y += 10;
+    }
 
-    // Add run session plan
-    const sessionPlan = document.getElementById("run-session-input").value;
-    if (sessionPlan) {
+    // === Session Plan ===
+    const plan = document.getElementById("run-session-input").value.trim();
+    if (plan) {
       doc.setFontSize(14);
       doc.text("Running Session Plan", 14, y);
       y += 8;
       doc.setFontSize(11);
-      sessionPlan.split("\n").forEach(line => {
+      plan.split("\n").forEach(line => {
         doc.text(line, 20, y);
         y += 6;
       });
       y += 10;
     }
 
-    // Add run metrics
-    const runMetrics = [
-      { label: "Avg Speed", id: "run-avg-speed", unit: "m/s" },
-      { label: "Avg Pace", id: "run-avg-pace", unit: "" },
+    // === Metrics ===
+    const metrics = [
+      { label: "Average Speed", id: "run-avg-speed", unit: "m/s" },
+      { label: "Average Pace", id: "run-avg-pace", unit: "/km" },
       { label: "Normalized Speed", id: "run-ns", unit: "m/s" },
-      { label: "Normalized Pace", id: "run-ns-pace", unit: "" },
+      { label: "Normalized Pace", id: "run-ns-pace", unit: "/km" },
       { label: "Variability Index", id: "run-vi", unit: "" },
       { label: "Intensity Factor", id: "run-if", unit: "" },
-      { label: "Load (TSS)", id: "run-tss", unit: "" }
+      { label: "Training Load (rTSS)", id: "run-tss", unit: "" }
     ];
 
     doc.setFontSize(14);
@@ -947,17 +954,16 @@ if (runPdfBtn) {
     y += 8;
     doc.setFontSize(11);
 
-    runMetrics.forEach(m => {
-      const value = document.getElementById(m.id)?.textContent || "--";
-      doc.text(`${m.label}: ${value} ${m.unit}`, 20, y);
+    metrics.forEach(m => {
+      const val = document.getElementById(m.id)?.textContent || "--";
+      doc.text(`${m.label}: ${val} ${m.unit}`, 20, y);
       y += 6;
     });
-
     y += 10;
 
-    // Add run session chart image
+    // === Chart Image ===
     const canvas = document.getElementById("run-session-graph");
-    if (canvas) {
+    if (canvas && canvas.toDataURL) {
       const imgData = canvas.toDataURL("image/png", 1.0);
       const pageWidth = doc.internal.pageSize.getWidth() - 30;
       const imgWidth = pageWidth;
@@ -971,9 +977,11 @@ if (runPdfBtn) {
       doc.addImage(imgData, "PNG", 15, y, imgWidth, imgHeight);
     }
 
-    doc.save("Running_Report.pdf");
+    doc.save(`${name.replace(/\s+/g, "_") || "Running"}_Report.pdf`);
   });
 }
+
+
 
   // ============================================
   // LOCAL STORAGE + SAVE / RECALL ATHLETE DATA
