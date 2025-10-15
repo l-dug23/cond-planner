@@ -15,15 +15,31 @@
 	<img src="logo.jpg" alt="graph of critical power">
 	<p class="description">Physically profile you or your athlete(s). Create graphs of your sessions with target time at certain pace/power/HR zones and predict load and intensity from session. Build 	progressions and review effectiveness. Graph actute:chronic training loads and fitness:fatigue:Freshness over time</p>
 <nav>
-	<ul>
-		<li><a href="#cycling">Cycling</a></li>
-		<li><a href="#running">Running</a></li>
-		<li><a href="#ASR">ASR</a></li>
-		<li><a href="#RSA">RSA</a></li>
-	</ul>
+  <ul>
+    <li><a href="#cycling">Cycling</a></li>
+    <li><a href="#running">Running</a></li>
+    <li><a href="#ASR">ASR</a></li>
+    <li><a href="#RSA">RSA</a></li>
+
+    <!-- New dropdown -->
+    <li class="dropdown">
+      <a href="#">Methods ▾</a>
+      <ul class="dropdown-content">
+        <li><a href="https://pmc.ncbi.nlm.nih.gov/articles/PMC5070974/" target="_blank" rel="noopener">2p CP Model</a></li>
+        <li><a href="https://pubmed.ncbi.nlm.nih.gov/8854981/" target="_blank" rel="noopener">3p CP Model</a></li>
+        <li><a href="https://pubmed.ncbi.nlm.nih.gov/22382171/" target="_blank" rel="noopener">Skiba W'bal model</a></li>
+        <li><a href="https://pmc.ncbi.nlm.nih.gov/articles/PMC8220144/" target="_blank" rel="noopener">Predicted LT</a></li>
+        <li><a href="https://www.wattkg.com/functional-threshold-power/" target="_blank" rel="noopener">FTP Coggan Calculation</a></li>
+        <li><a href="https://www.trainingpeaks.com/blog/power-training-levels/" target="_blank" rel="noopener">Training Zones</a></li>
+      </ul>
+    </li>
+  </ul>
 </nav>
+
 </header>
-<main>
+
+
+<main class="content">
 <section id="cycling">
 	<h2>Cycling<img src="cycling.svg" style="height:20px; vertical-align:middle; margin-left:10px;" alt="picture of cycling"></h2>
 	<h3>1. Physical Profiling: Basic FTP and advanced CP and W'</h3>
@@ -102,20 +118,7 @@
 
 </section>
 <hr></hr>
-<section>
-	<h4>Links to methods used to generate this analysis</h4>
-	<ul>
-	<li><a href="https://pmc.ncbi.nlm.nih.gov/articles/PMC5070974/?utm_source=chatgpt.com" target="blank">2p CP Model</a></li>
-	<li><a href="https://pubmed.ncbi.nlm.nih.gov/8854981/" target="blank">3p CP Model</a></li>
-	<li><a href="https://pubmed.ncbi.nlm.nih.gov/22382171/" target="blank">Skiba W'bal model</a></li>
-	<li><a href="https://pmc.ncbi.nlm.nih.gov/articles/PMC8220144/?utm_source=chatgpt.com" target="blank">Predicted LT</a></li>
-	<li><a href="https://www.wattkg.com/functional-threshold-power/?utm_source=chatgpt.com" target="blank">FTP Coggan Calculation</a></li>
-	<li><a href="https://www.trainingpeaks.com/blog/power-training-levels/?utm_source=chatgpt.com" target="blank">Training Zones</a></li>
-</ul>
 
-</section>
-
-<hr></hr>
 <section id="running">
 	<h2>Running<img src="Running.svg" style="height:20px; vertical-align:middle; margin-left:10px;" alt="picture of running"></h2>
 	<h3>1. Physical Profiling: Basic thresholds and advanced CS and D'</h3>
@@ -128,6 +131,7 @@
   </select>
   <button id="save-runner" type="button">Save Runner</button>
 </div>
+
 	<form id="cs-form">
 	<p>Enter your peak numbers (avg. pace/km) for analysis here:</p>
 	<label for="name">Name</label>
