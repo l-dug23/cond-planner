@@ -8,27 +8,39 @@ table { border-collapse: collapse; margin:10px 0; background-color: white; margi
 body {
 background-color: lightgrey;
 font-family: Open-Sans;
-}
-
-main {
+font-size: 22px;
+text-align: center;
+color: black;
 max-width: 1600px;
 margin: 0 auto;
 padding: 2rem;
 }
 
+main {
+  padding-top: 0.5rem;
+}
+
+.highlight {
+  color: blue;
+  background-color: gold;
+}
+
 section {
   background: #fff;
   padding: 1.5rem;
+  margin-top: 2rem;
   margin-bottom: 2rem;
   border-radius: 8px;
   box-shadow: 0 2px 6px rgba(0,0,0,0,0.08);
 }
 
-/* whole document text alignment*/
-body {
-text-align: center;
-color: black;
+.forminput {
+  font-weight: bold;
+  color: red;
 }
+
+
+
 ul {
   list-style: none;
   padding: 0;
