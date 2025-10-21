@@ -6,7 +6,7 @@ table { border-collapse: collapse; margin:10px 0; background-color: white; margi
 
 /* Background colour and width setting*/
 body {
-background-color: lightgrey;
+background: linear-gradient(to right, rgb(172, 171, 171), rgb(234, 234, 66));
 font-family: Open-Sans;
 font-size: 22px;
 text-align: center;
@@ -84,16 +84,6 @@ input:focus, select:focus {
   box-shadow: 0 0 4px rgba(0,119,204,0.3);
 }
 
-/* link styling*/
-a {
-color: black;
-}
-a:visited {
-color: yellow;
-}
-a:hover {
-color: lime;
-}
 
 /* Sort out styling of sesison graphs*/
 .session-graph {
@@ -149,7 +139,7 @@ nav a {
 
 /* Hover effect */
 nav a:hover {
-  color: #4db8ff;             /* accent colour */
+  color: #dde027;             /* accent colour */
   border-bottom: 2px solid #4db8ff;
 }
 
