@@ -454,92 +454,216 @@ if (zoneDiv) zoneDiv.innerHTML = zoneHtml;
         };
       });
 
+
       // Draw chart
       const ctx = canvas.getContext("2d");
       if (window.sessionChart) window.sessionChart.destroy();
       window.sessionChart = new Chart(ctx, {
-        type: "bar",
-        data: {
-          datasets: [
-            {
-              label: `Power (${baseChoice})`,
-              data: powerPoints,
-              parsing: false,
-              yAxisID: "y1",
-              backgroundColor: powerPoints.map(p => p.c),
-              borderWidth: 0,
-            },
-            {
-              label: "W′bal (J)",
-              data: wbalPoints,
-              type: "line",
-              parsing: false,
-              yAxisID: "y2",
-              borderColor: "red",
-              borderWidth: 2,
-              pointRadius: 0
-            },
-          ],
-        },
-        options: {
-          responsive: true,
-          plugins: { annotation: { annotations } },
-          scales: {
-            x: { type: "linear", title: { display: true, text: "Time (min)" }, min: 0 },
-            y1: { type: "linear", position: "left", title: { display: true, text: "Power (W)" }, beginAtZero: true },
-            y2: { type: "linear", position: "right", title: { display: true, text: "W′bal (J)" }, min: 0, max: WPRIME || undefined, beginAtZero: true },
-          },
-        },
-      });
+  type: "bar",
+  data: {
+    datasets: [
+      {
+        label: `Power (${baseChoice})`,
+        data: powerPoints,
+        parsing: false,
+        yAxisID: "y1",
+        backgroundColor: powerPoints.map(p => p.c),
+        borderWidth: 0,
+      },
+      {
+        label: "W′bal (J)",
+        data: wbalPoints,
+        type: "line",
+        parsing: false,
+        yAxisID: "y2",
+        borderColor: "red",
+        borderWidth: 2,
+        pointRadius: 0
+      },
+    ],
+  },
+  options: {
+    responsive: true,
+
+    // 👇 ADD THIS block just after responsive: true
+    layout: {
+      padding: { top: 30 } // ensures header labels aren’t clipped
+    },
+
+    plugins: {
+      annotation: { annotations },
+      legend: { position: "top" } // optional, keeps legend above graph
+    },
+
+    scales: {
+      x: { type: "linear", title: { display: true, text: "Time (min)" }, min: 0 },
+      y1: { type: "linear", position: "left", title: { display: true, text: "Power (W)" }, beginAtZero: true },
+      y2: { type: "linear", position: "right", title: { display: true, text: "W′bal (J)" }, min: 0, max: WPRIME || undefined, beginAtZero: true },
+    },
+  },
+});
+
 
       // Metrics
       updateCycleMetrics(powerSeries, CP);
     });
   }
 
-  // ---------- PDF export (Cycling) ----------
-  const pdfBtn = document.getElementById("download-pdf");
-  if (pdfBtn) {
-    pdfBtn.addEventListener("click", () => {
-      const { jsPDF } = window.jspdf;
-      const doc = new jsPDF("p", "mm", "a4");
-      doc.setFontSize(18);
-      doc.text("Cycling Conditioning Report", 14, 20);
-      let y = 30;
+// ---------- Enhanced PDF export (Cycling – Professional Layout) ----------
+const pdfBtn = document.getElementById("download-pdf");
+if (pdfBtn) {
+  pdfBtn.addEventListener("click", async () => {
+    const { jsPDF } = window.jspdf;
+    const doc = new jsPDF("p", "mm", "a4");
+    const accent = [66, 133, 244]; // blue accent (Google-style). Change RGB here for brand colour.
+    let y = 20;
 
-      const resultsEl = document.getElementById("results");
-      if (resultsEl && resultsEl.innerHTML.trim() !== "") {
-        const tmp = document.createElement("div");
-        tmp.innerHTML = resultsEl.innerHTML;
-        Array.from(tmp.querySelectorAll("p")).forEach((p) => {
+    // ---- Header ----
+    doc.setFontSize(20);
+    doc.setTextColor(accent[0], accent[1], accent[2]);
+    doc.text("Cycling Conditioning Report", 14, y);
+    y += 10;
+    doc.setDrawColor(accent[0], accent[1], accent[2]);
+    doc.setLineWidth(0.5);
+    doc.line(14, y, 195, y);
+    y += 8;
+
+    // ---- Athlete ----
+    const athleteName = document.getElementById("cp-name")?.value?.trim();
+    if (athleteName) {
+      doc.setFontSize(13);
+      doc.setTextColor(0, 0, 0);
+      doc.text(`Athlete: ${athleteName}`, 14, y);
+      y += 8;
+    }
+
+    // ---- Power Profile ----
+    const resultsEl = document.getElementById("results");
+    if (resultsEl && resultsEl.innerHTML.trim() !== "") {
+      doc.setFontSize(14);
+      doc.setTextColor(accent[0], accent[1], accent[2]);
+      doc.text("Power Profile", 14, y);
+      y += 6;
+      doc.setTextColor(0, 0, 0);
+      doc.setFontSize(11);
+
+      const tmp = document.createElement("div");
+      tmp.innerHTML = resultsEl.innerHTML;
+      Array.from(tmp.querySelectorAll("p")).forEach((p) => {
+        doc.text(p.innerText, 20, y);
+        y += 6;
+      });
+      y += 4;
+    }
+
+    // ---- Training Zones ----
+    const zoneEl = document.getElementById("cycle-zones");
+    if (zoneEl && zoneEl.innerHTML.trim() !== "") {
+      doc.setFontSize(14);
+      doc.setTextColor(accent[0], accent[1], accent[2]);
+      doc.text("Training Zones", 14, y);
+      y += 6;
+
+      doc.setDrawColor(180, 180, 180);
+      doc.setLineWidth(0.1);
+      const tmp = document.createElement("div");
+      tmp.innerHTML = zoneEl.innerHTML;
+      Array.from(tmp.querySelectorAll("tr")).forEach((tr, i) => {
+        const cells = Array.from(tr.querySelectorAll("td,th")).map(td => td.innerText);
+        if (i === 0) {
           doc.setFontSize(11);
-          doc.text(p.innerText, 14, y);
+          doc.setTextColor(255, 255, 255);
+          doc.setFillColor(accent[0], accent[1], accent[2]);
+          doc.rect(14, y - 4, 180, 8, "F");
+          doc.text(cells.join(" | "), 16, y + 2);
+          y += 8;
+        } else {
+          doc.setFontSize(10);
+          doc.setTextColor(0, 0, 0);
+          doc.text(cells.join(" | "), 16, y + 2);
           y += 6;
-        });
-      }
+        }
+        if (y > 270) { doc.addPage(); y = 20; }
+      });
+      y += 4;
+    }
 
-      const plan = document.getElementById("session-input").value.trim();
-      if (plan) {
-        doc.addPage();
-        y = 20;
-        doc.setFontSize(14);
-        doc.text("Cycling Session Plan", 14, y);
-        y += 8;
-        plan.split("\n").forEach((line) => {
-          doc.text(line, 20, y);
+    // ---- Predicted Powers ----
+    const predEl = document.getElementById("cycle-predictions");
+    if (predEl && predEl.innerHTML.trim() !== "") {
+      doc.setFontSize(14);
+      doc.setTextColor(accent[0], accent[1], accent[2]);
+      doc.text("Predicted Powers (1–6 min @ %W′)", 14, y);
+      y += 6;
+
+      const tmp = document.createElement("div");
+      tmp.innerHTML = predEl.innerHTML;
+      Array.from(tmp.querySelectorAll("tr")).forEach((tr, i) => {
+        const cells = Array.from(tr.querySelectorAll("td,th")).map(td => td.innerText);
+        if (i === 0) {
+          doc.setFontSize(11);
+          doc.setTextColor(255, 255, 255);
+          doc.setFillColor(accent[0], accent[1], accent[2]);
+          doc.rect(14, y - 4, 180, 8, "F");
+          doc.text(cells.join(" | "), 16, y + 2);
+          y += 8;
+        } else {
+          doc.setFontSize(10);
+          doc.setTextColor(0, 0, 0);
+          doc.text(cells.join(" | "), 16, y + 2);
           y += 6;
-        });
-      }
+        }
+        if (y > 270) { doc.addPage(); y = 20; }
+      });
+      y += 4;
+    }
 
-      const cv = document.getElementById("session-graph");
-      if (cv && cv.toDataURL) {
-        const img = cv.toDataURL("image/png", 1.0);
-        doc.addPage();
-        doc.addImage(img, "PNG", 15, 20, 180, 90);
-      }
-      doc.save("Cycling_Report.pdf");
-    });
-  }
+    // ---- Session Plan ----
+    const plan = document.getElementById("session-input").value.trim();
+    if (plan) {
+      if (y > 220) { doc.addPage(); y = 20; }
+      doc.setFontSize(14);
+      doc.setTextColor(accent[0], accent[1], accent[2]);
+      doc.text("Session Plan", 14, y);
+      y += 6;
+      doc.setFontSize(11);
+      doc.setTextColor(0, 0, 0);
+      plan.split("\n").forEach((line) => {
+        doc.text(line, 20, y);
+        y += 6;
+        if (y > 270) { doc.addPage(); y = 20; }
+      });
+      y += 4;
+    }
+
+    // ---- Session Graph ----
+    const cv = document.getElementById("session-graph");
+    if (cv && cv.toDataURL) {
+      const img = cv.toDataURL("image/png", 1.0);
+      if (y > 160) { doc.addPage(); y = 20; }
+      doc.setFontSize(14);
+      doc.setTextColor(accent[0], accent[1], accent[2]);
+      doc.text("Session Graph", 14, y);
+      y += 6;
+      doc.addImage(img, "PNG", 15, y, 180, 90);
+      y += 100;
+    }
+
+    // ---- Footer ----
+    doc.setDrawColor(accent[0], accent[1], accent[2]);
+    doc.setLineWidth(0.3);
+    doc.line(14, 285, 195, 285);
+    doc.setFontSize(9);
+    doc.setTextColor(100);
+    doc.text("Generated by Cycling Conditioning Planner", 14, 290);
+
+    // Save file
+    const filename = athleteName ? `${athleteName.replace(/\s+/g, "_")}_Cycling_Report.pdf` : "Cycling_Report.pdf";
+    doc.save(filename);
+  });
+}
+
+
 
   // ---------- Unimplemented exports (ZWO / FIT) ----------
   const zwoBtn = document.getElementById("export-.zwo");
