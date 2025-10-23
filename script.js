@@ -1,46 +1,136 @@
+// ============================================
+// SHARED UTILITIES (load first)
+// ============================================
 document.addEventListener("DOMContentLoaded", () => {
 
-  // ============================================
-  // CYCLING CP/FTP FORM
-  // ============================================
-  document.getElementById("cp-form").addEventListener("submit", function (e) {
+  // Expose a single app namespace
+  const App = (window.App = window.App || {});
+
+  // ---------- General helpers ----------
+  App.parseTimeInput = function parseTimeInput(val) {
+    if (!val) return NaN;
+    const parts = val.split(":").map(Number);
+    if (parts.length === 2) return parts[0] * 60 + parts[1];
+    if (parts.length === 3) return parts[0] * 3600 + parts[1] * 60 + parts[2];
+    return NaN;
+  };
+
+  App.formatTime = function formatTime(sec) {
+    const min = Math.floor(sec / 60);
+    const s = Math.round(sec % 60).toString().padStart(2, "0");
+    return `${min}:${s}`;
+  };
+
+  App.formatPace = function formatPace(secPerKm) {
+    const min = Math.floor(secPerKm / 60);
+    const sec = Math.round(secPerKm % 60).toString().padStart(2, "0");
+    return `${min}:${sec}/km`;
+  };
+
+  // ---------- Cycling metrics ----------
+  App.avg = arr => arr.reduce((a, b) => a + b, 0) / (arr.length || 1);
+
+  App.normalizedPower = function normalizedPower(powerData) {
+    if (powerData.length < 30) return App.avg(powerData);
+    const rolling = [];
+    for (let i = 0; i < powerData.length - 29; i++) {
+      const winAvg = App.avg(powerData.slice(i, i + 30));
+      rolling.push(Math.pow(winAvg, 4));
+    }
+    const mean4 = App.avg(rolling);
+    return Math.pow(mean4, 0.25);
+  };
+
+  App.variabilityIndex = (np, ap) => (ap ? np / ap : 0);
+  App.totalWorkKJ = (powerData, dt = 1) =>
+    powerData.reduce((a, p) => a + p * dt, 0) / 1000;
+
+  App.workAboveCPKJ = (powerData, cp, dt = 1) =>
+    powerData.reduce((a, p) => a + Math.max(0, p - cp) * dt, 0) / 1000;
+
+  App.intensityFactor = (np, cp) => (cp ? np / cp : 0);
+  App.trainingLoadTSS = (np, IF, durationSec, cp) =>
+    cp ? ((durationSec * np * IF) / (cp * 3600)) * 100 : 0;
+
+  // ---------- Running metrics ----------
+  App.avgSpeed = App.avg; // m/s per second
+  App.normalizedSpeed = function normalizedSpeed(speedData) {
+    if (speedData.length < 30) return App.avgSpeed(speedData);
+    const rolling = [];
+    for (let i = 0; i < speedData.length - 29; i++) {
+      const winAvg = App.avgSpeed(speedData.slice(i, i + 30));
+      rolling.push(Math.pow(winAvg, 4));
+    }
+    const mean4 = App.avg(rolling);
+    return Math.pow(mean4, 0.25);
+  };
+});
+
+// ============================================
+// CYCLING MODULE
+// ============================================
+document.addEventListener("DOMContentLoaded", () => {
+  if (!document.getElementById("cycling")) return;
+
+  const $ = (sel) => document.querySelector(sel);
+  const $$ = (sel) => document.querySelectorAll(sel);
+
+  // Globals
+  let CP, FTP, WPRIME;
+
+  // ---------- CP/FTP FORM ----------
+const cpForm = document.getElementById("cp-form");
+if (cpForm) {
+  cpForm.addEventListener("submit", (e) => {
     e.preventDefault();
 
-    const p3 = parseFloat(document.getElementById("3min").value);
-    const p6 = parseFloat(document.getElementById("6min").value);
-    const p20 = parseFloat(document.getElementById("20min").value);
-    const model = document.querySelector('input[name="Model"]:checked').value;
+    // Scope all queries to the CP form to avoid collisions
+    const p3 = parseFloat(cpForm.querySelector("#p3min")?.value);
+    const p6 = parseFloat(cpForm.querySelector("#p6min")?.value);
+    const p20 = parseFloat(cpForm.querySelector("#p20min")?.value);
+    const model = cpForm.querySelector('input[name="cycleModel"]:checked')?.value;  // <-- scoped
 
-    if (isNaN(p3) || isNaN(p6) || isNaN(p20)) {
+    // Quick sanity logging (you can remove after verifying)
+    console.log("[CP submit] p3:", p3, "p6:", p6, "p20:", p20, "model:", model);
+
+    if ([p3, p6, p20].some(v => Number.isNaN(v))) {
       document.getElementById("results").innerHTML = "Please enter 3, 6, and 20-min powers.";
       return;
     }
 
-    // Times in seconds
+    // Times (s) and powers (W)
     const times = [180, 360, 1200];
     const powers = [p3, p6, p20];
 
     let cp, wprime, tau;
 
     if (model === "2pModel") {
+      // 2-parameter model via linear regression on Work = CP*t + W'
       const work = times.map((t, i) => powers[i] * t);
       const n = times.length;
-      const sumT = times.reduce((a, b) => a + b, 0);
-      const sumW = work.reduce((a, b) => a + b, 0);
-      const sumTT = times.reduce((a, b) => a + b * b, 0);
+      const sumT  = times.reduce((a, b) => a + b, 0);
+      const sumW  = work.reduce((a, b) => a + b, 0);
+      const sumTT = times.reduce((a, t) => a + t * t, 0);         // correct t^2
       const sumTW = times.reduce((a, t, i) => a + t * work[i], 0);
 
-      cp = (n * sumTW - sumT * sumW) / (n * sumTT - sumT * sumT);
+      const denom = (n * sumTT - sumT * sumT);
+      if (denom === 0) {
+        document.getElementById("results").innerHTML = "Unable to compute CP (check inputs).";
+        return;
+      }
+
+      cp     = (n * sumTW - sumT * sumW) / denom;
       wprime = (sumW - cp * sumT) / n;
     }
 
     if (model === "3pModel") {
+      // Simple grid search (rough) for CP and tau; estimate W′ as avg work above CP
       let bestErr = Infinity;
       for (let testCP = 100; testCP <= 400; testCP += 1) {
         for (let testTau = 1; testTau <= 200; testTau += 5) {
-          const wEst = times.reduce((acc, t, i) => acc + (powers[i] - testCP) * (t + testTau), 0) / times.length;
-          const preds = times.map((t, i) => testCP + wEst / (t + testTau));
-          const err = preds.reduce((acc, pred, i) => acc + (pred - powers[i]) ** 2, 0);
+          const wEst  = times.reduce((acc, t, i) => acc + (powers[i] - testCP) * t, 0) / times.length;
+          const preds = times.map(t => testCP + wEst / (t + testTau));
+          const err   = preds.reduce((acc, pred, i) => acc + (pred - powers[i]) ** 2, 0);
           if (err < bestErr) {
             bestErr = err;
             cp = testCP;
@@ -51,1090 +141,537 @@ document.addEventListener("DOMContentLoaded", () => {
       }
     }
 
-    // Predicted efforts
-    const fractions = [1.0, 0.9, 0.8, 0.7, 0.6, 0.5];
-    const durationsMin = [1, 2, 3, 4, 5, 6];
-    let predRows = "";
-    durationsMin.forEach(m => {
-      const t = m * 60;
-      predRows += `<tr><td>${m} min</td>`;
-      fractions.forEach(f => {
-        let pPred = (model === "2pModel")
-          ? cp + (f * wprime / t)
-          : cp + (f * wprime / (t + tau));
-        predRows += `<td>${pPred.toFixed(1)} W</td>`;
-      });
-      predRows += "</tr>";
-    });
-    let predTable = `<h3>Predicted Max Efforts (from CP & W′)</h3>
-                   <table>
-                     <tr><th>Duration</th>${fractions.map(f => `<th>${Math.round(f * 100)}% W′</th>`).join("")}</tr>
-                     ${predRows}
-                   </table>`;
-
-    // Zone tables
-    const zones = [
-      { name: "Zone 1", low: 0, high: 0.55, color: "#c8e6c9" },
-      { name: "Zone 2", low: 0.56, high: 0.75, color: "#fff9c4" },
-      { name: "Zone 3", low: 0.76, high: 0.90, color: "#ffe082" },
-      { name: "Zone 4", low: 0.91, high: 1.05, color: "#ffccbc" },
-      { name: "Zone 5", low: 1.06, high: 1.20, color: "#ef9a9a" },
-      { name: "Zone 6", low: 1.21, high: 1.50, color: "#f48fb1" },
-      { name: "Zone 7", low: 1.51, high: null, color: "#ce93d8" }
-    ];
-    function buildZoneTable(base, label) {
-      let html = `<h3>${label} Zones</h3><table>
-                 <tr><th>Zone</th><th>% of ${label}</th><th>Watts</th></tr>`;
-      zones.forEach(z => {
-        const lowW = (base * z.low).toFixed(0);
-        const highW = z.high ? (base * z.high).toFixed(0) : "∞";
-        html += `<tr style="background:${z.color};">
-                 <td>${z.name}</td>
-                 <td>${(z.low * 100).toFixed(0)}${z.high ? "–" + (z.high * 100).toFixed(0) : "+"}%</td>
-                 <td>${lowW} – ${highW}</td>
-               </tr>`;
-      });
-      html += "</table>";
-      return html;
+    if (!Number.isFinite(cp) || !Number.isFinite(wprime)) {
+      document.getElementById("results").innerHTML = "Calculation failed (check inputs).";
+      return;
     }
 
     const ftp = p20 * 0.95;
     const lt1 = cp * 0.75;
     const lt2 = cp * 0.90;
 
-    let output = `<p><strong>Estimated FTP:</strong> ${ftp.toFixed(1)} W</p>
-                <p><strong>Critical Power (CP):</strong> ${cp.toFixed(1)} W</p>
-                <p><strong>W′:</strong> ${(wprime / 1000).toFixed(1)} kJ</p>
-                <p><strong>Estimated LT1:</strong> ${lt1.toFixed(1)} W</p>
-                <p><strong>Estimated LT2:</strong> ${lt2.toFixed(1)} W</p>`;
-    if (model === "3pModel") {
-      output += `<p><strong>Tau (τ):</strong> ${tau.toFixed(1)} s</p>`;
+    let html = `
+      <p><strong>FTP:</strong> ${ftp.toFixed(1)} W</p>
+      <p><strong>CP:</strong> ${cp.toFixed(1)} W</p>
+      <p><strong>W′:</strong> ${(wprime / 1000).toFixed(1)} kJ</p>
+      <p><strong>LT1 (≈75% CP):</strong> ${lt1.toFixed(1)} W</p>
+      <p><strong>LT2 (≈90% CP):</strong> ${lt2.toFixed(1)} W</p>
+    `;
+    if (model === "3pModel" && Number.isFinite(tau)) {
+      html += `<p><strong>τ:</strong> ${tau.toFixed(1)} s</p>`;
     }
-    output += `<div class="zone-tables">
-               ${buildZoneTable(ftp, "FTP")}
-               ${buildZoneTable(cp, "CP")}
-             </div>`;
-    output += predTable;
+    document.getElementById("results").innerHTML = html;
 
-    document.getElementById("results").innerHTML = output;
+/// ===== Predicted Powers at 1–6 min for % of W′ used =====
+const timePoints = [60, 120, 180, 240, 300, 360]; // 1–6 min in seconds
+const wprimePercents = [100, 90, 80, 70, 60, 50]; // % W′ used
+let effortHtml = "<h4>Predicted Power (W) for 1–6 min Efforts at % W′ Use</h4>";
+effortHtml += "<table><tr><th>Duration</th>";
 
-    // Store globals
+wprimePercents.forEach(p => (effortHtml += `<th>${p}% W′</th>`));
+effortHtml += "</tr>";
+
+timePoints.forEach(t => {
+  effortHtml += `<tr><td>${t / 60} min</td>`;
+  wprimePercents.forEach(pct => {
+    const wEff = wprime * (pct / 100);
+    const predPower = cp + wEff / t;
+    effortHtml += `<td>${predPower.toFixed(0)}</td>`;
+  });
+  effortHtml += "</tr>";
+});
+
+effortHtml += "</table>";
+const predDiv = document.getElementById("cycle-predictions");
+if (predDiv) predDiv.innerHTML = effortHtml;
+
+
+// ===== Training Zones =====
+const zones = [
+  { name: "Z1 – Active Recovery", low: 0.0, high: 0.55, color: "#71d874" },
+  { name: "Z2 – Endurance",      low: 0.56, high: 0.75, color: "#d8c518" },
+  { name: "Z3 – Tempo",          low: 0.76, high: 0.90, color: "#ffe082" },
+  { name: "Z4 – Threshold",      low: 0.91, high: 1.05, color: "#e68264" },
+  { name: "Z5 – VO₂max",         low: 1.06, high: 1.20, color: "#e04141" },
+  { name: "Z6 – Anaerobic",      low: 1.21, high: 1.50, color: "#e62968" },
+  { name: "Z7 – Neuromuscular",  low: 1.51, high: Infinity, color: "#c528e1" },
+];
+let zoneHtml = "<h4>Power Training Zones (by % CP)</h4><table><tr><th>Zone</th><th>%CP</th><th>Watts</th></tr>";
+zones.forEach(z => {
+  const lo = (z.low * cp).toFixed(0);
+  const hi = isFinite(z.high) ? (z.high * cp).toFixed(0) : ">";
+  zoneHtml += `<tr style="background:${z.color}30"><td>${z.name}</td><td>${Math.round(z.low*100)}–${isFinite(z.high)?Math.round(z.high*100):"∞"}%</td><td>${lo}–${hi}</td></tr>`;
+});
+zoneHtml += "</table>";
+const zoneDiv = document.getElementById("cycle-zones");
+if (zoneDiv) zoneDiv.innerHTML = zoneHtml;
+
+
+
+    // expose to session generator
+    CP = cp;
+    FTP = ftp;
+    WPRIME = wprime;
+
     window.cp = cp;
     window.ftp = ftp;
     window.wprime = wprime;
   });
-
-
-  // ============================================
-  // CYCLING SESSION GENERATOR (fixed ranges)
-  // ============================================
-  document.getElementById("generate-session").addEventListener("click", function () {
-    if (!window.cp || !window.ftp) {
-      alert("Please calculate CP/FTP first!");
-      return;
-    }
-
-    const selected = document.querySelector('#train-select input[name="trainBase"]:checked').value;
-    const base = (selected === "CP") ? window.cp : window.ftp;
-
-    const text = document.getElementById("session-input").value;
-    const lines = text.split("\n").map(l => l.trim()).filter(l => l);
-
-    let intervals = [];
-    let sections = [];
-    let currentTime = 0; // seconds elapsed when parsing (for section starts)
-
-    lines.forEach(line => {
-      const repeatMatch = line.match(/(\d+)x\s*\((.+)\)/i);
-      if (repeatMatch) {
-        const reps = parseInt(repeatMatch[1], 10);
-        const block = repeatMatch[2].split(",").map(s => s.trim());
-        for (let r = 0; r < reps; r++) {
-          block.forEach(b => {
-            const parsed = parseCycleInterval(b, base, currentTime);
-            if (!parsed) return;
-            if (parsed.isSection) {
-              sections.push({ label: parsed.label, start: currentTime });
-            } else {
-              intervals.push(parsed);
-              currentTime += parsed.dur;
-            }
-          });
-        }
-      } else {
-        const parsed = parseCycleInterval(line, base, currentTime);
-        if (!parsed) return;
-        if (parsed.isSection) {
-          sections.push({ label: parsed.label, start: currentTime });
-        } else {
-          intervals.push(parsed);
-          currentTime += parsed.dur;
-        }
-      }
-    });
-
-    if (intervals.length === 0) {
-      alert("No valid session lines found.");
-      return;
-    }
-
-    // ---- Zone colours ----
-    const zoneColors = [
-      { name: "Zone 1", low: 0, high: 0.55, color: "#71d874ff" },
-      { name: "Zone 2", low: 0.56, high: 0.75, color: "#d8c518ff" },
-      { name: "Zone 3", low: 0.76, high: 0.90, color: "#ffe082" },
-      { name: "Zone 4", low: 0.91, high: 1.05, color: "#e68264ff" },
-      { name: "Zone 5", low: 1.06, high: 1.20, color: "#e04141ff" },
-      { name: "Zone 6", low: 1.21, high: 1.50, color: "#e62968ff" },
-      { name: "Zone 7", low: 1.51, high: null, color: "#c528e1ff" }
-    ];
-    function getZoneColor(power, cp) {
-      const ratio = power / cp;
-      for (const z of zoneColors) {
-        if (!z.high || (ratio >= z.low && ratio <= z.high)) return z.color;
-      }
-      return "gray";
-    }
-
-    // ---- Build datasets & annotations ----
-    let powers = [];   // {x,y,c}
-    let wbal = [];   // {x,y}
-    const annotations = {}; // section & range boxes go here
-
-    let wpbal = window.wprime;
-    const dt = 1;
-    const CP = window.cp;
-
-    // cursor = start time of current interval (seconds)
-    let cursor = 0;
-
-    intervals.forEach((intv, idx) => {
-      const startMin = cursor / 60;
-      const endMin = (cursor + intv.dur) / 60;
-
-      // If this interval had a watt range, add ONE shaded box for the whole interval
-      if (intv.low && intv.high) {
-        annotations["range" + idx] = {
-          type: 'box',
-          xScaleID: 'x',
-          yScaleID: 'y1',
-          xMin: startMin,
-          xMax: endMin,
-          yMin: intv.low,
-          yMax: intv.high,
-          backgroundColor: 'rgba(30,144,255,0.18)', // semi-opaque
-          borderWidth: 0,
-          drawTime: 'beforeDatasetsDraw'
-        };
-      }
-
-      // Per-second points for power & W′bal
-      for (let i = 0; i < intv.dur; i++) {
-        const tSec = cursor + i + 1;
-        const timeMin = tSec / 60;
-
-        powers.push({
-          x: timeMin,
-          y: intv.power,
-          c: getZoneColor(intv.power, CP)
-        });
-
-        if (intv.power > CP) {
-          wpbal -= (intv.power - CP) * dt;
-        } else {
-          wpbal += (CP - intv.power) * dt * (1 - wpbal / window.wprime);
-        }
-        if (wpbal < 0) wpbal = 0;
-        if (wpbal > window.wprime) wpbal = window.wprime;
-
-        wbal.push({ x: timeMin, y: wpbal });
-      }
-
-      cursor += intv.dur;
-    });
-
-    // ---- Section shading boxes (Warm up >>, etc.) ----
-    sections.forEach((s, i) => {
-      const end = sections[i + 1] ? sections[i + 1].start / 60 : cursor / 60;
-      annotations["section" + i] = {
-        type: 'box',
-        xScaleID: 'x',
-        yScaleID: 'y1',
-        xMin: s.start / 60,
-        xMax: end,
-        yMin: 0,
-        yMax: 'max',
-        backgroundColor: 'rgba(0,0,0,0.06)',
-        borderWidth: 0,
-        label: { content: s.label, enabled: true, position: "start" },
-        drawTime: 'beforeDatasetsDraw'
-      };
-    });
-
-    // ---- Build metrics ----
-const powerData = powers.map(p => p.y); // extract watts only
-updateMetrics(powerData, CP);
-
-function averagePower(powerData) {
-  return powerData.reduce((a, b) => a + b, 0) / powerData.length;
 }
 
-function normalizedPower(powerData) {
-  if (powerData.length < 30) return averagePower(powerData);
-  const rolling = [];
-  for (let i = 0; i < powerData.length - 29; i++) {
-    const window = powerData.slice(i, i + 30);
-    const avg = window.reduce((a, b) => a + b, 0) / 30;
-    rolling.push(Math.pow(avg, 4));
+
+  // ---------- Save / Recall (Cycling) ----------
+  const saveBtn = $("#save-athlete");
+  const athleteSelect = $("#athlete-select");
+
+  function updateAthleteList() {
+    if (!athleteSelect) return;
+    athleteSelect.innerHTML = "<option value=''>Select athlete</option>";
+    Object.keys(localStorage)
+      .filter((k) => k.startsWith("athlete_"))
+      .forEach((key) => {
+        const name = key.replace("athlete_", "");
+        const opt = document.createElement("option");
+        opt.value = name;
+        opt.textContent = name;
+        athleteSelect.appendChild(opt);
+      });
   }
-  const mean4 = rolling.reduce((a, b) => a + b, 0) / rolling.length;
-  return Math.pow(mean4, 0.25);
-}
-
-function variabilityIndex(np, ap) {
-  return np / ap;
-}
-
-function totalWork(powerData, dt = 1) {
-  const joules = powerData.reduce((a, p) => a + p * dt, 0);
-  return joules / 1000; // kJ
-}
-
-function workAboveCP(powerData, cp, dt = 1) {
-  const joules = powerData.reduce((a, p) => a + Math.max(0, p - cp) * dt, 0);
-  return joules / 1000; // kJ
-}
-
-function intensityFactor(np, cp) {
-  return np / cp;
-}
-
-function trainingLoad(np, ifactor, durationSec, cp) {
-  return (durationSec * np * ifactor) / (cp * 3600) * 100;
-}
-
-function updateMetrics(powerData, cp) {
-  const ap = averagePower(powerData);
-  const np = normalizedPower(powerData);
-  const vi = variabilityIndex(np, ap);
-  const work = totalWork(powerData);
-  const workAbove = workAboveCP(powerData, cp);
-  const ifactor = intensityFactor(np, cp);
-  const tss = trainingLoad(np, ifactor, powerData.length, cp);
-
-  document.getElementById('avg-power').textContent = ap.toFixed(1);
-  document.getElementById('np').textContent = np.toFixed(1);
-  document.getElementById('vi').textContent = vi.toFixed(2);
-  document.getElementById('work').textContent = work.toFixed(1);
-  document.getElementById('work-above').textContent = workAbove.toFixed(1);
-  document.getElementById('if').textContent = ifactor.toFixed(2);
-  document.getElementById('tss').textContent = tss.toFixed(0);
-}
-
-    // ---- Draw chart ----
-    const ctx = document.getElementById("session-graph").getContext("2d");
-    if (window.sessionChart) window.sessionChart.destroy();
-    window.sessionChart = new Chart(ctx, {
-      type: 'bar',
-      data: {
-        datasets: [
-          {
-            label: `Power (using ${selected})`,
-            data: powers,
-            yAxisID: 'y1',
-            backgroundColor: powers.map(p => p.c),
-            borderWidth: 0
-          },
-          {
-            label: "W′bal (J)",
-            data: wbal,
-            type: 'line',
-            borderColor: 'red',
-            borderWidth: 2,
-            yAxisID: 'y2',
-            parsing: false
-          }
-        ]
-      },
-      options: {
-        plugins: {
-          annotation: { annotations }
-        },
-        scales: {
-          x: { type: 'linear', title: { display: true, text: "Time (min)" }, min: 0, ticks: { stepSize: 1 } },
-          y1: { type: 'linear', position: 'left', title: { display: true, text: "Power (W)" }, beginAtZero: true },
-          y2: { type: 'linear', position: 'right', title: { display: true, text: "W′bal (J)" }, min: 0, max: window.wprime, beginAtZero: true }
-        }
-      }
+  if (saveBtn && athleteSelect && cpForm) {
+    updateAthleteList();
+    saveBtn.addEventListener("click", (e) => {
+      e.preventDefault();
+      const name = $("#cp-name").value.trim();
+      if (!name) return alert("Please enter a name before saving.");
+      const data = { name };
+      cpForm.querySelectorAll("input[type='number']").forEach((inp) => (data[inp.id] = inp.value));
+      const model = cpForm.querySelector("input[name='Model']:checked");
+      data.model = model ? model.value : "";
+      localStorage.setItem("athlete_" + name, JSON.stringify(data));
+      alert("Saved data for " + name);
+      updateAthleteList();
+      athleteSelect.value = name;
     });
-  });
 
+    athleteSelect.addEventListener("change", () => {
+      const sel = athleteSelect.value;
+      if (!sel) return;
+      const data = JSON.parse(localStorage.getItem("athlete_" + sel) || "{}");
+      $("#cp-name").value = data.name || "";
+      cpForm.querySelectorAll("input[type='number']").forEach((inp) => {
+        if (data[inp.id] !== undefined) inp.value = data[inp.id];
+      });
+      const modelRadio = cpForm.querySelector(`input[value='${data.model}']`);
+      if (modelRadio) modelRadio.checked = true;
+    });
+  }
 
+  // ---------- Session Generator (Cycling) ----------
+  const genBtn = $("#generate-session");
+  const canvas = $("#session-graph");
+  const baseForm = $("#train-select");
 
-  // ============================================
-  // HELPER FOR INTERVAL PARSING
-  // ============================================
-  function parseCycleInterval(str, base, currentTime) {
-    // Section labels like "Warm up >>"
-    let match = str.match(/(.+)\s*>>/i);
-    if (match) {
-      return { isSection: true, label: match[1].trim() };
+  // zone colors for bars
+  const zoneColors = [
+    { low: 0.0, high: 0.55, color: "#71d874ff" },
+    { low: 0.56, high: 0.75, color: "#d8c518ff" },
+    { low: 0.76, high: 0.90, color: "#ffe082" },
+    { low: 0.91, high: 1.05, color: "#e68264ff" },
+    { low: 1.06, high: 1.20, color: "#e04141ff" },
+    { low: 1.21, high: 1.50, color: "#e62968ff" },
+    { low: 1.51, high: Infinity, color: "#c528e1ff" }
+  ];
+  function getZoneColor(power, cp) {
+    const r = cp ? power / cp : 0;
+    for (const z of zoneColors) {
+      if (r >= z.low && r <= z.high) return z.color;
+    }
+    return "#9e9e9e";
+  }
+
+  // Parse helper: time + @ % OR absolute W OR range W
+  function parseCycleInterval(str, base) {
+    // Section label
+    let m = str.match(/(.+)\s*>>/i);
+    if (m) return { section: m[1].trim() };
+
+    // % (of base)
+    m = str.match(/(?:(\d+)min)?\s*(?:(\d+)sec)?\s*@\s*(\d+)%/i);
+    if (m) {
+      const dur = (parseInt(m[1] || 0, 10) * 60) + (parseInt(m[2] || 0, 10));
+      const pct = parseInt(m[3], 10) / 100;
+      return { dur, power: base * pct };
     }
 
-    // %CP or %FTP
-    match = str.match(/(?:(\d+)min)?\s*(?:(\d+)sec)?\s*@\s*(\d+)%/i);
-    if (match) {
-      const mins = parseInt(match[1] || 0, 10);
-      const secs = parseInt(match[2] || 0, 10);
-      const dur = mins * 60 + secs;
-      const perc = parseInt(match[3], 10) / 100;
-      const power = base * perc;
+    // absolute watts
+    m = str.match(/(?:(\d+)min)?\s*(?:(\d+)sec)?\s*@\s*(\d+)\s*w/i);
+    if (m) {
+      const dur = (parseInt(m[1] || 0, 10) * 60) + (parseInt(m[2] || 0, 10));
+      const power = parseInt(m[3], 10);
       return { dur, power };
     }
 
-    // Absolute watts
-    match = str.match(/(?:(\d+)min)?\s*(?:(\d+)sec)?\s*@\s*(\d+)\s*w/i);
-    if (match) {
-      const mins = parseInt(match[1] || 0, 10);
-      const secs = parseInt(match[2] || 0, 10);
-      const dur = mins * 60 + secs;
-      const power = parseInt(match[3], 10);
-      return { dur, power };
-    }
-
-    // Watt range e.g. "200-250w"
-    match = str.match(/(?:(\d+)min)?\s*(?:(\d+)sec)?\s*@\s*(\d+)\s*-\s*(\d+)\s*w/i);
-    if (match) {
-      const mins = parseInt(match[1] || 0, 10);
-      const secs = parseInt(match[2] || 0, 10);
-      const dur = mins * 60 + secs;
-      const low = parseInt(match[3], 10);
-      const high = parseInt(match[4], 10);
-      const power = (low + high) / 2; // midpoint
-      return { dur, power, low, high };
+    // watt range "low-high w"
+    m = str.match(/(?:(\d+)min)?\s*(?:(\d+)sec)?\s*@\s*(\d+)\s*-\s*(\d+)\s*w/i);
+    if (m) {
+      const dur = (parseInt(m[1] || 0, 10) * 60) + (parseInt(m[2] || 0, 10));
+      const low = parseInt(m[3], 10);
+      const high = parseInt(m[4], 10);
+      return { dur, power: (low + high) / 2, low, high };
     }
 
     return null;
   }
 
-  // ============================================
-  // RUNNING CS FORM
-  // ============================================
-  function parseTimeInput(val) {
-    if (!val) return NaN;
-    const parts = val.split(":").map(Number);
-    if (parts.length === 2) return parts[0] * 60 + parts[1];
-    if (parts.length === 3) return parts[0] * 3600 + parts[1] * 60 + parts[2];
-    return NaN;
-  }
-  function formatTime(sec) {
-    const min = Math.floor(sec / 60);
-    const s = Math.round(sec % 60).toString().padStart(2, '0');
-    return `${min}:${s}`;
-  }
-  function formatPace(secPerKm) {
-    const min = Math.floor(secPerKm / 60);
-    const sec = Math.round(secPerKm % 60).toString().padStart(2, '0');
-    return `${min}:${sec}/km`;
-  }
-  function averageSpeed(data) {
-  return data.reduce((a, b) => a + b, 0) / data.length;
-}
+  function updateCycleMetrics(powerSeries, cp) {
+    const ap = App.avg(powerSeries);
+    const np = App.normalizedPower(powerSeries);
+    const vi = App.variabilityIndex(np, ap);
+    const work = App.totalWorkKJ(powerSeries);
+    const workAbove = App.workAboveCPKJ(powerSeries, cp);
+    const IF = App.intensityFactor(np, cp);
+    const tss = App.trainingLoadTSS(np, IF, powerSeries.length, cp);
 
-function normalizedSpeed(data) {
-  if (data.length < 30) return averageSpeed(data);
-  const rolling = [];
-  for (let i = 0; i < data.length - 29; i++) {
-    const avg = data.slice(i, i + 30).reduce((a, b) => a + b, 0) / 30;
-    rolling.push(Math.pow(avg, 4));
-  }
-  const mean4 = rolling.reduce((a, b) => a + b, 0) / rolling.length;
-  return Math.pow(mean4, 0.25);
-}
-function updateRunMetrics(speedData, cs) {
-  const ap = averageSpeed(speedData);
-  const ns = normalizedSpeed(speedData);
-  const vi = ns / ap;
-  const ifactor = ns / cs;
-  const tss = (speedData.length * ns * ifactor) / (cs * 3600) * 100;
-
-  const apPace = formatPace(1000 / ap);
-  const nsPace = formatPace(1000 / ns);
-
-  document.getElementById('run-avg-speed').textContent = ap.toFixed(2);
-  document.getElementById('run-avg-pace').textContent = apPace;
-  document.getElementById('run-ns').textContent = ns.toFixed(2);
-  document.getElementById('run-ns-pace').textContent = nsPace;
-  document.getElementById('run-vi').textContent = vi.toFixed(2);
-  document.getElementById('run-if').textContent = ifactor.toFixed(2);
-  document.getElementById('run-tss').textContent = tss.toFixed(0);
-}
-
-  document.getElementById("cs-form").addEventListener("submit", function (e) {
-    e.preventDefault();
-
-    const inputs = [
-      { id: "1km", dist: 1000 },
-      { id: "3km", dist: 3000 },
-      { id: "5km", dist: 5000 },
-      { id: "10km", dist: 10000 }
-    ];
-
-    let distances = [];
-    let times = [];
-    inputs.forEach(d => {
-      const pace = parseTimeInput(document.getElementById(d.id).value);
-      if (!isNaN(pace)) {
-        distances.push(d.dist);
-        times.push(pace * (d.dist / 1000));
-      }
-    });
-
-    if (distances.length < 2) {
-      document.getElementById("run-results").innerHTML = "Please enter at least two valid paces.";
-      return;
-    }
-
-    const n = distances.length;
-    let sumT = 0, sumD = 0, sumTT = 0, sumTD = 0;
-    for (let i = 0; i < n; i++) {
-      sumT += times[i];
-      sumD += distances[i];
-      sumTT += times[i] * times[i];
-      sumTD += times[i] * distances[i];
-    }
-    const CS = (n * sumTD - sumT * sumD) / (n * sumTT - sumT * sumT);
-    const Dprime = (sumD - CS * sumT) / n;
-
-    window.CS = CS;
-    window.Dprime = Dprime;
-
-    let output = `<p><strong>Critical Speed (CS):</strong> ${CS.toFixed(2)} m/s (${formatPace(1000 / CS)})</p>`;
-    output += `<p><strong>D′:</strong> ${Dprime.toFixed(1)} m</p>`;
-
-    const fractions = [1.0, 0.9, 0.8, 0.7, 0.6, 0.5];
-    output += "<h3>Predicted Performances</h3><table><tr><th>Distance</th>";
-    fractions.forEach(f => output += `<th>${Math.round(f * 100)}% D′</th>`);
-    output += "</tr>";
-
-    [1, 2, 3, 4, 5, 10].forEach(km => {
-      const D = km * 1000;
-      output += `<tr><td>${km} km</td>`;
-      fractions.forEach(f => {
-        const T = (D - (f * Dprime)) / CS;
-        const pace = T / km;
-        output += `<td>${formatTime(T)} (${formatPace(pace)})</td>`;
-      });
-      output += "</tr>";
-    });
-    output += "</table>";
-
-    // Running Zones
-    const runZones = [
-      { name: "Zone 1", low: 0.0, high: 0.80, color: "#c8e6c9" },
-      { name: "Zone 2", low: 0.80, high: 0.90, color: "#fff9c4" },
-      { name: "Zone 3", low: 0.90, high: 1.00, color: "#ffe082" },
-      { name: "Zone 4", low: 1.00, high: 1.05, color: "#ffccbc" },
-      { name: "Zone 5", low: 1.05, high: null, color: "#ef9a9a" }
-    ];
-    window.runZones = runZones;
-
-    output += "<h3>Running Zones (based on CS)</h3><table><tr><th>Zone</th><th>%CS</th><th>Pace</th></tr>";
-    runZones.forEach(z => {
-      const lowSpeed = CS * z.low;
-      const highSpeed = z.high ? CS * z.high : Infinity;
-      const lowPace = formatPace(1000 / lowSpeed);
-      const highPace = z.high ? formatPace(1000 / highSpeed) : "faster";
-      output += `<tr style="background:${z.color};"><td>${z.name}</td><td>${(z.low * 100).toFixed(0)}${z.high ? "–" + (z.high * 100).toFixed(0) : "+"}%</td><td>${lowPace} – ${highPace}</td></tr>`;
-    });
-    output += "</table>";
-
-    document.getElementById("run-results").innerHTML = output;
-  });
-
-
-  // ============================================
-  // RUNNING CS FORM
-  // ============================================
-  function parseTimeInput(val) {
-    if (!val) return NaN;
-    const parts = val.split(":").map(Number);
-    if (parts.length === 2) return parts[0] * 60 + parts[1];
-    if (parts.length === 3) return parts[0] * 3600 + parts[1] * 60 + parts[2];
-    return NaN;
-  }
-  function formatTime(sec) {
-    const min = Math.floor(sec / 60);
-    const s = Math.round(sec % 60).toString().padStart(2, '0');
-    return `${min}:${s}`;
-  }
-  function formatPace(secPerKm) {
-    const min = Math.floor(secPerKm / 60);
-    const sec = Math.round(secPerKm % 60).toString().padStart(2, '0');
-    return `${min}:${sec}/km`;
+    $("#avg-power").textContent = ap.toFixed(1);
+    $("#np").textContent = np.toFixed(1);
+    $("#vi").textContent = vi.toFixed(2);
+    $("#work").textContent = work.toFixed(1);
+    $("#work-above").textContent = workAbove.toFixed(1);
+    $("#if").textContent = IF.toFixed(2);
+    $("#tss").textContent = tss.toFixed(0);
   }
 
-  document.getElementById("cs-form").addEventListener("submit", function (e) {
-    e.preventDefault();
+  if (genBtn && canvas && baseForm) {
+    genBtn.addEventListener("click", () => {
+      if (!CP || !FTP) return alert("Please calculate CP/FTP first.");
+      const baseChoice = document.querySelector('#train-select input[name="trainBase"]:checked')?.value || "CP";
+      const base = baseChoice === "CP" ? CP : FTP;
 
-    const inputs = [
-      { id: "1km", dist: 1000 },
-      { id: "3km", dist: 3000 },
-      { id: "5km", dist: 5000 },
-      { id: "10km", dist: 10000 }
-    ];
+      const text = document.getElementById("session-input").value;
+      const lines = text.split("\n").map(s => s.trim()).filter(Boolean);
 
-    let distances = [];
-    let times = [];
-    inputs.forEach(d => {
-      const pace = parseTimeInput(document.getElementById(d.id).value);
-      if (!isNaN(pace)) {
-        distances.push(d.dist);
-        times.push(pace * (d.dist / 1000));
-      }
-    });
+      let intervals = [];
+      let sections = [];
+      let tCursor = 0;
 
-    if (distances.length < 2) {
-      document.getElementById("run-results").innerHTML = "Please enter at least two valid paces.";
-      return;
-    }
-
-    const n = distances.length;
-    let sumT = 0, sumD = 0, sumTT = 0, sumTD = 0;
-    for (let i = 0; i < n; i++) {
-      sumT += times[i];
-      sumD += distances[i];
-      sumTT += times[i] * times[i];
-      sumTD += times[i] * distances[i];
-    }
-    const CS = (n * sumTD - sumT * sumD) / (n * sumTT - sumT * sumT);
-    const Dprime = (sumD - CS * sumT) / n;
-
-    window.CS = CS;
-
-    let output = `<p><strong>Critical Speed (CS):</strong> ${CS.toFixed(2)} m/s (${formatPace(1000 / CS)})</p>`;
-    output += `<p><strong>D′:</strong> ${Dprime.toFixed(1)} m</p>`;
-
-    const fractions = [1.0, 0.9, 0.8, 0.7, 0.6, 0.5];
-    output += "<h3>Predicted Performances</h3><table><tr><th>Distance</th>";
-    fractions.forEach(f => output += `<th>${Math.round(f * 100)}% D′</th>`);
-    output += "</tr>";
-
-    [1, 2, 3, 4, 5, 10].forEach(km => {
-      const D = km * 1000;
-      output += `<tr><td>${km} km</td>`;
-      fractions.forEach(f => {
-        const T = (D - (f * Dprime)) / CS;
-        const pace = T / km;
-        output += `<td>${formatTime(T)} (${formatPace(pace)})</td>`;
-      });
-      output += "</tr>";
-    });
-    output += "</table>";
-
-    // Running Zones
-    const runZones = [
-      { name: "Zone 1", low: 0.0, high: 0.80, color: "#c8e6c9" },
-      { name: "Zone 2", low: 0.80, high: 0.90, color: "#fff9c4" },
-      { name: "Zone 3", low: 0.90, high: 1.00, color: "#ffe082" },
-      { name: "Zone 4", low: 1.00, high: 1.05, color: "#ffccbc" },
-      { name: "Zone 5", low: 1.05, high: null, color: "#ef9a9a" }
-    ];
-    window.runZones = runZones;
-
-    output += "<h3>Running Zones (based on CS)</h3><table><tr><th>Zone</th><th>%CS</th><th>Pace</th></tr>";
-    runZones.forEach(z => {
-      const lowSpeed = CS * z.low;
-      const highSpeed = z.high ? CS * z.high : Infinity;
-      const lowPace = formatPace(1000 / lowSpeed);
-      const highPace = z.high ? formatPace(1000 / highSpeed) : "faster";
-      output += `<tr style="background:${z.color};"><td>${z.name}</td><td>${(z.low * 100).toFixed(0)}${z.high ? "–" + (z.high * 100).toFixed(0) : "+"}%</td><td>${lowPace} – ${highPace}</td></tr>`;
-    });
-    output += "</table>";
-
-    document.getElementById("run-results").innerHTML = output;
-  });
-
-
-  // ============================================
-  // RUNNING SESSION GENERATOR
-  // ============================================
-  document.getElementById("generate-run-session").addEventListener("click", function () {
-    if (!window.CS) {
-      alert("Please calculate Critical Speed (CS) first!");
-      return;
-    }
-
-    const text = document.getElementById("run-session-input").value;
-    const lines = text.split("\n").map(l => l.trim()).filter(l => l);
-
-    let intervals = [];
-    let descriptors = [];
-    let currentDesc = "";
-
-    lines.forEach(line => {
-      if (line.includes(">>")) {
-        currentDesc = line.replace(">>", "").trim();
-      } else {
-        const repeatMatch = line.match(/(\d+)x\s*\((.+)\)/i);
-        if (repeatMatch) {
-          const reps = parseInt(repeatMatch[1], 10);
-          const block = repeatMatch[2].split(",").map(s => s.trim());
+      lines.forEach(line => {
+        const repeat = line.match(/(\d+)x\s*\((.+)\)/i);
+        if (repeat) {
+          const reps = parseInt(repeat[1], 10);
+          const block = repeat[2].split(",").map(s => s.trim());
           for (let r = 0; r < reps; r++) {
-            block.forEach(b => parseRunInterval(b, intervals, currentDesc, descriptors));
+            block.forEach(b => {
+              const parsed = parseCycleInterval(b, base);
+              if (!parsed) return;
+              if (parsed.section) {
+                sections.push({ label: parsed.section, start: tCursor });
+              } else {
+                intervals.push(parsed);
+                tCursor += parsed.dur;
+              }
+            });
           }
         } else {
-          parseRunInterval(line, intervals, currentDesc, descriptors);
-        }
-      }
-    });
-
-    if (intervals.length === 0) {
-      alert("No valid running session lines found. Use format: '10min @ 95%CS' or '1k @ 95%CS'.");
-      return;
-    }
-
-    let t = 0;
-    let data = [];
-    let sectionLabels = [];
-
-    intervals.forEach(intv => {
-      for (let i = 0; i < intv.dur; i++) {
-        t++;
-        const timeMin = t / 60;
-        data.push({
-          x: timeMin,
-          y: intv.intensity * 100,
-          pace: formatPace(intv.pace)
-        });
-      }
-      if (intv.desc) {
-        sectionLabels.push({
-          x: t / 60 - intv.dur / 120,
-          y: intv.intensity * 100 + 5,
-          text: `${intv.desc} (${formatPace(intv.pace)})`
-        });
-      }
-    });
-
-    const ctx = document.getElementById("run-session-graph").getContext("2d");
-    if (window.runSessionChart) window.runSessionChart.destroy();
-
-    window.runSessionChart = new Chart(ctx, {
-      type: 'bar',
-      data: {
-        datasets: [{
-          label: "Running Intensity (%CS)",
-          data: data,
-          parsing: false,
-          backgroundColor: data.map(d => {
-            const zone = window.runZones.find(z => d.y / 100 >= z.low && (!z.high || d.y / 100 < z.high));
-            return zone ? zone.color : "#90caf9";
-          })
-        }]
-      },
-      options: {
-        plugins: {
-          tooltip: {
-            callbacks: {
-              label: function (context) {
-                return `Pace: ${context.raw.pace}`;
-              }
-            }
-          },
-          annotation: {
-            annotations: sectionLabels.map((s, i) => ({
-              type: 'label',
-              xValue: s.x,
-              yValue: s.y,
-              backgroundColor: 'rgba(0,0,0,0)',
-              content: [s.text],
-              font: { weight: "bold" },
-              rotation: -90
-            }))
+          const parsed = parseCycleInterval(line, base);
+          if (!parsed) return;
+          if (parsed.section) {
+            sections.push({ label: parsed.section, start: tCursor });
+          } else {
+            intervals.push(parsed);
+            tCursor += parsed.dur;
           }
-        },
-        scales: {
-          x: { type: 'linear', title: { display: true, text: "Time (min)" }, min: 0 },
-          y: { title: { display: true, text: "%CS" }, min: 50, max: 130 }
-        }
-      }
-    });
-    const speedData = intervals.flatMap(intv => Array(intv.dur).fill(window.CS * intv.intensity));
-updateRunMetrics(speedData, window.CS);
-window.runIntervals = intervals; // optional: for export
-  });
-
-
-
-  function parseRunInterval(str, intervals, currentDesc, descriptors) {
-    // Match time-based %CS
-    let match = str.match(/(?:(\d+)min)?\s*(?:(\d+)sec)?\s*@\s*(\d+)(?:-(\d+))?%CS/i);
-    if (match) {
-      const mins = parseInt(match[1] || 0, 10);
-      const secs = parseInt(match[2] || 0, 10);
-      const dur = mins * 60 + secs;
-      const percLow = parseInt(match[3], 10) / 100;
-      const percHigh = match[4] ? parseInt(match[4], 10) / 100 : percLow;
-      const perc = (percLow + percHigh) / 2;
-      const speed = window.CS * perc;
-      const pace = 1000 / speed;
-      intervals.push({ dur, intensity: perc, pace, desc: currentDesc });
-      return;
-    }
-
-    // Match distance-based %CS (e.g., 1k @ 95%CS or 400m @ 100%CS)
-    match = str.match(/(\d+)(m|km)\s*@\s*(\d+)(?:-(\d+))?%CS/i);
-    if (match) {
-      const dist = parseInt(match[1], 10) * (match[2] === "km" ? 1000 : 1);
-      const percLow = parseInt(match[3], 10) / 100;
-      const percHigh = match[4] ? parseInt(match[4], 10) / 100 : percLow;
-      const perc = (percLow + percHigh) / 2;
-      const speed = window.CS * perc;
-      const pace = 1000 / speed;
-      const dur = dist / speed;
-      intervals.push({ dur, intensity: perc, pace, desc: currentDesc });
-    }
-  }
-
-  // === PDF Export for Cycling ===
-  const cyclePdfBtn = document.getElementById("download-pdf");
-  if (cyclePdfBtn) {
-    cyclePdfBtn.addEventListener("click", async () => {
-      const { jsPDF } = window.jspdf;
-      const doc = new jsPDF("p", "mm", "a4");
-
-      doc.setFontSize(18);
-      doc.text("Cycling Conditioning Analysis Report", 14, 20);
-
-      let y = 30;
-
-      // Collect results content
-      const resultsHtml = document.getElementById("results").innerHTML;
-      const tempDiv = document.createElement("div");
-      tempDiv.innerHTML = resultsHtml;
-
-      Array.from(tempDiv.querySelectorAll("p, h3, table")).forEach(el => {
-        if (el.tagName === "P" || el.tagName === "H3") {
-          doc.setFontSize(el.tagName === "H3" ? 14 : 11);
-          doc.text(el.innerText, 14, y);
-          y += 8;
-        } else if (el.tagName === "TABLE") {
-          const rows = Array.from(el.querySelectorAll("tr")).map(tr =>
-            Array.from(tr.querySelectorAll("td,th")).map(td => td.innerText)
-          );
-          doc.autoTable({ head: [rows[0]], body: rows.slice(1), startY: y });
-          y = doc.lastAutoTable.finalY + 10;
         }
       });
 
-      // Add session plan text
-      const sessionPlan = document.getElementById("session-input").value;
-      if (sessionPlan) {
+      if (!intervals.length) return alert("No valid session lines found.");
+
+      // Build series
+      const dt = 1;
+      let wpbal = WPRIME ?? 0;
+      const powerPoints = [];
+      const wbalPoints = [];
+      let powerSeries = [];
+      let cursor = 0;
+
+      intervals.forEach((iv) => {
+        for (let i = 0; i < iv.dur; i++) {
+          const tSec = cursor + i + 1;
+          const tMin = tSec / 60;
+          powerPoints.push({ x: tMin, y: iv.power, c: getZoneColor(iv.power, CP) });
+          powerSeries.push(iv.power);
+
+          // crude W'bal: deplete above CP, recover below CP with simple exp term
+          if (iv.power > CP) {
+            wpbal -= (iv.power - CP) * dt;
+          } else {
+            // Simple bounded recovery
+            wpbal += (CP - iv.power) * dt * (1 - wpbal / (WPRIME || 1));
+          }
+          wpbal = Math.max(0, Math.min(wpbal, WPRIME || 0));
+          wbalPoints.push({ x: tMin, y: wpbal });
+        }
+        cursor += iv.dur;
+      });
+
+      // annotations (sections + ranges)
+      const annotations = {};
+      intervals.reduce((acc, iv, idx) => {
+        // draw watt range band
+        if (iv.low && iv.high) {
+          const startMin = acc / 60;
+          const endMin = (acc + iv.dur) / 60;
+          annotations["rng" + idx] = {
+            type: "box",
+            xScaleID: "x",
+            yScaleID: "y1",
+            xMin: startMin,
+            xMax: endMin,
+            yMin: iv.low,
+            yMax: iv.high,
+            backgroundColor: "rgba(30,144,255,0.18)",
+            borderWidth: 0,
+            drawTime: "beforeDatasetsDraw",
+          };
+        }
+        return acc + iv.dur;
+      }, 0);
+
+      sections.forEach((s, i) => {
+        const start = s.start / 60;
+        const end = (sections[i + 1]?.start ?? cursor) / 60;
+        annotations["sec" + i] = {
+          type: "box",
+          xScaleID: "x",
+          yScaleID: "y1",
+          xMin: start,
+          xMax: end,
+          yMin: 0,
+          yMax: "max",
+          backgroundColor: "rgba(0,0,0,0.06)",
+          borderWidth: 0,
+          label: { content: s.label, enabled: true, position: "start" },
+          drawTime: "beforeDatasetsDraw",
+        };
+      });
+
+      // Draw chart
+      const ctx = canvas.getContext("2d");
+      if (window.sessionChart) window.sessionChart.destroy();
+      window.sessionChart = new Chart(ctx, {
+        type: "bar",
+        data: {
+          datasets: [
+            {
+              label: `Power (${baseChoice})`,
+              data: powerPoints,
+              parsing: false,
+              yAxisID: "y1",
+              backgroundColor: powerPoints.map(p => p.c),
+              borderWidth: 0,
+            },
+            {
+              label: "W′bal (J)",
+              data: wbalPoints,
+              type: "line",
+              parsing: false,
+              yAxisID: "y2",
+              borderColor: "red",
+              borderWidth: 2,
+              pointRadius: 0
+            },
+          ],
+        },
+        options: {
+          responsive: true,
+          plugins: { annotation: { annotations } },
+          scales: {
+            x: { type: "linear", title: { display: true, text: "Time (min)" }, min: 0 },
+            y1: { type: "linear", position: "left", title: { display: true, text: "Power (W)" }, beginAtZero: true },
+            y2: { type: "linear", position: "right", title: { display: true, text: "W′bal (J)" }, min: 0, max: WPRIME || undefined, beginAtZero: true },
+          },
+        },
+      });
+
+      // Metrics
+      updateCycleMetrics(powerSeries, CP);
+    });
+  }
+
+  // ---------- PDF export (Cycling) ----------
+  const pdfBtn = document.getElementById("download-pdf");
+  if (pdfBtn) {
+    pdfBtn.addEventListener("click", () => {
+      const { jsPDF } = window.jspdf;
+      const doc = new jsPDF("p", "mm", "a4");
+      doc.setFontSize(18);
+      doc.text("Cycling Conditioning Report", 14, 20);
+      let y = 30;
+
+      const resultsEl = document.getElementById("results");
+      if (resultsEl && resultsEl.innerHTML.trim() !== "") {
+        const tmp = document.createElement("div");
+        tmp.innerHTML = resultsEl.innerHTML;
+        Array.from(tmp.querySelectorAll("p")).forEach((p) => {
+          doc.setFontSize(11);
+          doc.text(p.innerText, 14, y);
+          y += 6;
+        });
+      }
+
+      const plan = document.getElementById("session-input").value.trim();
+      if (plan) {
+        doc.addPage();
+        y = 20;
         doc.setFontSize(14);
         doc.text("Cycling Session Plan", 14, y);
         y += 8;
-        doc.setFontSize(11);
-        sessionPlan.split("\n").forEach(line => {
+        plan.split("\n").forEach((line) => {
           doc.text(line, 20, y);
           y += 6;
         });
-        y += 10;
       }
 
-      // Add session metrics
-const metrics = [
-  { label: "Average Power", id: "avg-power", unit: "W" },
-  { label: "Normalized Power", id: "np", unit: "W" },
-  { label: "Variability Index", id: "vi", unit: "" },
-  { label: "Total Work", id: "work", unit: "kJ" },
-  { label: "Work Above CP", id: "work-above", unit: "kJ" },
-  { label: "Intensity Factor", id: "if", unit: "" },
-  { label: "Load (TSS)", id: "tss", unit: "" }
-];
-
-doc.setFontSize(14);
-doc.text("Session Metrics", 14, y);
-y += 8;
-doc.setFontSize(11);
-
-metrics.forEach(m => {
-  const value = document.getElementById(m.id)?.textContent || "--";
-  doc.text(`${m.label}: ${value} ${m.unit}`, 20, y);
-  y += 6;
-});
-
-y += 10;
-
-      // Add the chart image, scaled nicely
-      const canvas = document.getElementById("session-graph");
-      if (canvas) {
-        const imgData = canvas.toDataURL("image/png", 1.0);
-        const pageWidth = doc.internal.pageSize.getWidth() - 30;
-        const imgWidth = pageWidth;
-        const imgHeight = (canvas.height / canvas.width) * imgWidth;
-
-        // If image too tall, add new page
-        if (y + imgHeight > doc.internal.pageSize.getHeight() - 20) {
-          doc.addPage();
-          y = 20;
-        }
-
-        doc.addImage(imgData, "PNG", 15, y, imgWidth, imgHeight);
+      const cv = document.getElementById("session-graph");
+      if (cv && cv.toDataURL) {
+        const img = cv.toDataURL("image/png", 1.0);
+        doc.addPage();
+        doc.addImage(img, "PNG", 15, 20, 180, 90);
       }
-
       doc.save("Cycling_Report.pdf");
     });
   }
- // === PDF Export for Running ===
-const runPdfBtn = document.getElementById("download-run-pdf");
-if (runPdfBtn) {
-  runPdfBtn.addEventListener("click", async () => {
-    const { jsPDF } = window.jspdf;
-    const doc = new jsPDF("p", "mm", "a4");
 
-    // Header
-    doc.setFontSize(18);
-    const name = document.getElementById("cs-name")?.value || "Athlete";
-    doc.text(`Running Conditioning Report — ${name}`, 14, 20);
+  // ---------- Unimplemented exports (ZWO / FIT) ----------
+  const zwoBtn = document.getElementById("export-.zwo");
+  const fitBtn = document.getElementById("export-.fit");
+  if (zwoBtn) zwoBtn.addEventListener("click", () => alert("ZWO export coming soon."));
+  if (fitBtn) fitBtn.addEventListener("click", () => alert(".FIT export coming soon."));
+});
 
-    let y = 30;
+// ============================================
+// RUNNING MODULE
+// ============================================
+document.addEventListener("DOMContentLoaded", () => {
+  if (!document.getElementById("running")) return;
 
-    // === Results Section ===
-    const resultsEl = document.getElementById("run-results");
-    if (resultsEl && resultsEl.innerHTML.trim() !== "") {
-      const tempDiv = document.createElement("div");
-      tempDiv.innerHTML = resultsEl.innerHTML;
+  const $ = (sel) => document.querySelector(sel);
 
-      Array.from(tempDiv.querySelectorAll("p, h3, table")).forEach(el => {
-        if (el.tagName === "P" || el.tagName === "H3") {
-          doc.setFontSize(el.tagName === "H3" ? 14 : 11);
-          doc.text(el.innerText, 14, y);
-          y += 8;
-        } else if (el.tagName === "TABLE") {
-          const rows = Array.from(el.querySelectorAll("tr")).map(tr =>
-            Array.from(tr.querySelectorAll("td,th")).map(td => td.innerText)
-          );
-          doc.autoTable({ head: [rows[0]], body: rows.slice(1), startY: y });
-          y = doc.lastAutoTable.finalY + 10;
-        }
-      });
-    } else {
-      doc.text("No running results generated yet.", 14, y);
-      y += 10;
-    }
+  // Globals
+  let CS = null, DPRIME = null;
 
-    // === Session Plan ===
-    const plan = document.getElementById("run-session-input").value.trim();
-    if (plan) {
-      doc.setFontSize(14);
-      doc.text("Running Session Plan", 14, y);
-      y += 8;
-      doc.setFontSize(11);
-      plan.split("\n").forEach(line => {
-        doc.text(line, 20, y);
-        y += 6;
-      });
-      y += 10;
-    }
-
-    // === Metrics ===
-    const metrics = [
-      { label: "Average Speed", id: "run-avg-speed", unit: "m/s" },
-      { label: "Average Pace", id: "run-avg-pace", unit: "/km" },
-      { label: "Normalized Speed", id: "run-ns", unit: "m/s" },
-      { label: "Normalized Pace", id: "run-ns-pace", unit: "/km" },
-      { label: "Variability Index", id: "run-vi", unit: "" },
-      { label: "Intensity Factor", id: "run-if", unit: "" },
-      { label: "Training Load (rTSS)", id: "run-tss", unit: "" }
-    ];
-
-    doc.setFontSize(14);
-    doc.text("Session Metrics", 14, y);
-    y += 8;
-    doc.setFontSize(11);
-
-    metrics.forEach(m => {
-      const val = document.getElementById(m.id)?.textContent || "--";
-      doc.text(`${m.label}: ${val} ${m.unit}`, 20, y);
-      y += 6;
-    });
-    y += 10;
-
-    // === Chart Image ===
-    const canvas = document.getElementById("run-session-graph");
-    if (canvas && canvas.toDataURL) {
-      const imgData = canvas.toDataURL("image/png", 1.0);
-      const pageWidth = doc.internal.pageSize.getWidth() - 30;
-      const imgWidth = pageWidth;
-      const imgHeight = (canvas.height / canvas.width) * imgWidth;
-
-      if (y + imgHeight > doc.internal.pageSize.getHeight() - 20) {
-        doc.addPage();
-        y = 20;
-      }
-
-      doc.addImage(imgData, "PNG", 15, y, imgWidth, imgHeight);
-    }
-
-    doc.save(`${name.replace(/\s+/g, "_") || "Running"}_Report.pdf`);
-  });
-}
-
-
-
-  // ============================================
-  // LOCAL STORAGE + SAVE / RECALL ATHLETE DATA
-  // ============================================
-
-  // === AUTO-SAVE individual form fields ===
-  const cpForm = document.getElementById("cp-form");
-  if (cpForm) {
-    ["cp-name", "1min", "3min", "6min", "12min", "20min"].forEach(id => {
-      const saved = localStorage.getItem("cpform-" + id);
-      if (saved) document.getElementById(id).value = saved;
-    });
-    cpForm.addEventListener("input", e => {
-      if (e.target.id) localStorage.setItem("cpform-" + e.target.id, e.target.value);
-    });
-  }
-
+  // ---------- CS / D' FORM ----------
   const csForm = document.getElementById("cs-form");
   if (csForm) {
-    ["cs-name", "1km", "3km", "5km", "10km"].forEach(id => {
-      const saved = localStorage.getItem("csform-" + id);
-      if (saved) document.getElementById(id).value = saved;
-    });
-    csForm.addEventListener("input", e => {
-      if (e.target.id) localStorage.setItem("csform-" + e.target.id, e.target.value);
-    });
-  }
+    csForm.addEventListener("submit", (e) => {
+      e.preventDefault();
+      const inputs = [
+        { id: "1km", dist: 1000 },
+        { id: "3km", dist: 3000 },
+        { id: "5km", dist: 5000 },
+        { id: "10km", dist: 10000 },
+      ];
 
-  // === SAVE / RECALL ATHLETE DATA for CP Form ===
-  const saveButton = document.getElementById("save-athlete");
-  const select = document.getElementById("athlete-select");
+      const dists = [], times = [];
+      inputs.forEach((d) => {
+        const t = App.parseTimeInput(document.getElementById(d.id).value);
+        if (!isNaN(t)) {
+          dists.push(d.dist);
+          times.push(t * (d.dist / 1000)); // seconds for that distance
+        }
+      });
 
-  if (saveButton && select && cpForm) {
-    updateAthleteList();
-
-    saveButton.addEventListener("click", e => {
-      e.preventDefault(); // prevent form refresh if inside <form>
-      console.log("Save button clicked ✅");
-
-      const name = cpForm.querySelector("#cp-name").value.trim();
-      if (!name) {
-        alert("Please enter a name before saving.");
+      if (dists.length < 2) {
+        document.getElementById("run-results").innerHTML = "Please enter at least two valid paces.";
         return;
       }
 
-      const formData = { name };
+      const n = dists.length;
+      let sumT = 0, sumD = 0, sumTT = 0, sumTD = 0;
+      for (let i = 0; i < n; i++) {
+        sumT += times[i];
+        sumD += dists[i];
+        sumTT += times[i] * times[i];
+        sumTD += times[i] * dists[i];
+      }
+      CS = (n * sumTD - sumT * sumD) / (n * sumTT - sumT * sumT);
+      DPRIME = (sumD - CS * sumT) / n;
+      window.CS = CS;
+      window.Dprime = DPRIME;
 
-      // Save all number inputs by ID
-      cpForm.querySelectorAll("input[type='number']").forEach(input => {
-        formData[input.id] = input.value;
-      });
+      document.getElementById("run-results").innerHTML =
+        `<p><strong>Critical Speed (CS):</strong> ${CS.toFixed(2)} m/s (${App.formatPace(1000 / CS)})</p>
+         <p><strong>D′:</strong> ${DPRIME.toFixed(1)} m</p>`;
 
-      // Handle model radio safely
-      const modelRadio = cpForm.querySelector("input[name='Model']:checked");
-      formData.model = modelRadio ? modelRadio.value : "";
+         // ===== Predicted paces for 1–10 km =====
+const predDists = [1000, 2000, 3000, 5000, 10000];
+let predRunHtml = "<h4>Predicted Paces</h4><table><tr><th>Distance</th><th>Speed (m/s)</th><th>Pace</th></tr>";
+predDists.forEach(d => {
+  const t = (d - DPRIME) / CS;      // simple linear CS–D′ model
+  const spd = d / t;
+  const pace = App.formatPace(1000 / spd);
+  predRunHtml += `<tr><td>${d/1000} km</td><td>${spd.toFixed(2)}</td><td>${pace}</td></tr>`;
+});
+predRunHtml += "</table>";
+document.getElementById("run-predictions").innerHTML = predRunHtml;
 
-      // Save to localStorage
-      localStorage.setItem(`athlete_${name}`, JSON.stringify(formData));
-      alert(`Saved data for ${name}`);
+// ===== Predicted Speeds & Paces for 1–10 km at % of D′ Used =====
+const runDprimePercents = [100, 90, 80, 70];
+const runDistances = [1000, 2000, 3000, 5000, 10000];
+let effortRunHtml = "<h4>Predicted Paces for 1–10 km Efforts at % of D′ Use</h4>";
+effortRunHtml += "<table><tr><th>Distance</th>";
 
-      updateAthleteList();
-      select.value = name;
+runDprimePercents.forEach(p => (effortRunHtml += `<th>${p}% D′</th>`));
+effortRunHtml += "</tr>";
+
+runDistances.forEach(d => {
+  effortRunHtml += `<tr><td>${d / 1000} km</td>`;
+  runDprimePercents.forEach(pct => {
+    const dEff = DPRIME * (pct / 100);
+    const t = (d - dEff) / CS;       // adjusted duration using reduced D′ use
+    const spd = d / t;               // m/s
+    const pace = App.formatPace(1000 / spd);
+    effortRunHtml += `<td>${pace}</td>`;
+  });
+  effortRunHtml += "</tr>";
+});
+
+effortRunHtml += "</table>";
+const effortDiv = document.getElementById("run-predictions");
+if (effortDiv) effortDiv.innerHTML += effortRunHtml;
+
+
+// ===== Running Zones =====
+const runZones = [
+  { name: "Z1 – Easy",      low: 0.0,  high: 0.80, color: "#c8e6c9" },
+  { name: "Z2 – Steady",    low: 0.80, high: 0.90, color: "#fff9c4" },
+  { name: "Z3 – Tempo",     low: 0.90, high: 1.00, color: "#ffe082" },
+  { name: "Z4 – Threshold", low: 1.00, high: 1.05, color: "#ffccbc" },
+  { name: "Z5 – Interval",  low: 1.05, high: 1.20, color: "#ef9a9a" },
+];
+let zoneRunHtml = "<h4>Speed Zones (by % CS)</h4><table><tr><th>Zone</th><th>%CS</th><th>Pace</th></tr>";
+runZones.forEach(z => {
+  const loSpd = CS * z.low;
+  const hiSpd = CS * z.high;
+  const loPace = App.formatPace(1000 / hiSpd);
+  const hiPace = App.formatPace(1000 / loSpd);
+  zoneRunHtml += `<tr style="background:${z.color}30"><td>${z.name}</td><td>${Math.round(z.low*100)}–${Math.round(z.high*100)}%</td><td>${loPace}–${hiPace}</td></tr>`;
+});
+zoneRunHtml += "</table>";
+document.getElementById("run-zones").innerHTML = zoneRunHtml;
+  
     });
-
-    select.addEventListener("change", () => {
-      const selected = select.value;
-      if (!selected) return;
-
-      const data = JSON.parse(localStorage.getItem(`athlete_${selected}`));
-      if (!data) return;
-
-      cpForm.querySelector("#cp-name").value = data.name || "";
-
-      cpForm.querySelectorAll("input[type='number']").forEach(input => {
-        if (data[input.id] !== undefined) input.value = data[input.id];
-      });
-
-      const modelRadio = cpForm.querySelector(`input[value='${data.model}']`);
-      if (modelRadio) modelRadio.checked = true;
-    });
-
-    function updateAthleteList() {
-      select.innerHTML = "<option value=''>Select athlete</option>";
-      Object.keys(localStorage)
-        .filter(key => key.startsWith("athlete_"))
-        .forEach(key => {
-          const name = key.replace("athlete_", "");
-          const opt = document.createElement("option");
-          opt.value = name;
-          opt.textContent = name;
-          select.appendChild(opt);
-        });
-    }
   }
-// === SAVE / RECALL ATHLETE DATA for CS (Running) Form ===
-const saveRunButton = document.getElementById("save-runner");
-const runSelect = document.getElementById("runner-select");
 
+  // ---------- Save / Recall (Running) ----------
+  const saveRunBtn = document.getElementById("save-runner");
+  const runSelect = document.getElementById("runner-select");
 
-if (saveRunButton && runSelect && csForm) {
-  updateRunnerList();
-
-  // Save runner data
-  saveRunButton.addEventListener("click", e => {
-    e.preventDefault();
-    const name = csForm.querySelector("#cs-name").value.trim();
-    if (!name) {
-      alert("Please enter a name before saving.");
-      return;
-    }
-
-    const formData = { name };
-
-    // Save all pace inputs
-    ["1km", "3km", "5km", "10km"].forEach(id => {
-      formData[id] = csForm.querySelector(`[id='${id}']`).value;
-    });
-
-    // Save model (2P or 3P)
-    const modelRadio = csForm.querySelector("input[name='Model']:checked");
-    formData.model = modelRadio ? modelRadio.value : "";
-
-    // Save to localStorage
-    localStorage.setItem(`runner_${name}`, JSON.stringify(formData));
-    alert(`Saved data for ${name}`);
-
-    updateRunnerList();
-    runSelect.value = name;
-  });
-
-  // Load runner data when selected
-  runSelect.addEventListener("change", () => {
-    const selected = runSelect.value;
-    if (!selected) return;
-
-    const data = JSON.parse(localStorage.getItem(`runner_${selected}`));
-    if (!data) return;
-
-    csForm.querySelector("#cs-name").value = data.name || "";
-    ["1km", "3km", "5km", "10km"].forEach(id => {
-      if (data[id] !== undefined) csForm.querySelector(`[id='${id}']`).value = data[id];
-    });
-
-    const modelRadio = csForm.querySelector(`input[value='${data.model}']`);
-    if (modelRadio) modelRadio.checked = true;
-  });
-
-  // Build dropdown from saved runners
   function updateRunnerList() {
+    if (!runSelect) return;
     runSelect.innerHTML = "<option value=''>Select runner</option>";
     Object.keys(localStorage)
-      .filter(key => key.startsWith("runner_"))
-      .forEach(key => {
+      .filter((k) => k.startsWith("runner_"))
+      .forEach((key) => {
         const name = key.replace("runner_", "");
         const opt = document.createElement("option");
         opt.value = name;
@@ -1142,7 +679,340 @@ if (saveRunButton && runSelect && csForm) {
         runSelect.appendChild(opt);
       });
   }
+
+  if (saveRunBtn && runSelect && csForm) {
+    updateRunnerList();
+    saveRunBtn.addEventListener("click", (e) => {
+      e.preventDefault();
+      const name = document.getElementById("cs-name").value.trim();
+      if (!name) return alert("Please enter a name before saving.");
+      const data = { name };
+      ["1km", "3km", "5km", "10km"].forEach((id) => (data[id] = document.getElementById(id).value));
+      localStorage.setItem("runner_" + name, JSON.stringify(data));
+      alert("Saved data for " + name);
+      updateRunnerList();
+      runSelect.value = name;
+    });
+
+    runSelect.addEventListener("change", () => {
+      const sel = runSelect.value;
+      if (!sel) return;
+      const data = JSON.parse(localStorage.getItem("runner_" + sel) || "{}");
+      document.getElementById("cs-name").value = data.name || "";
+      ["1km", "3km", "5km", "10km"].forEach((id) => {
+        if (data[id]) document.getElementById(id).value = data[id];
+      });
+    });
+  }
+
+  // ---------- Running Session Generator + Metrics ----------
+  const genRunBtn = document.getElementById("generate-run-session");
+  const runCanvas = document.getElementById("run-session-graph");
+
+  const runZones = [
+    { name: "Z1", low: 0.0, high: 0.80, color: "#c8e6c9" },
+    { name: "Z2", low: 0.80, high: 0.90, color: "#fff9c4" },
+    { name: "Z3", low: 0.90, high: 1.00, color: "#ffe082" },
+    { name: "Z4", low: 1.00, high: 1.05, color: "#ffccbc" },
+    { name: "Z5", low: 1.05, high: Infinity, color: "#ef9a9a" },
+  ];
+  window.runZones = runZones; // for tooltip coloring
+
+  function parseRunInterval(str) {
+    // Section
+    let m = str.match(/(.+)\s*>>/i);
+    if (m) return { section: m[1].trim() };
+
+    // Time-based @ %CS
+    m = str.match(/(?:(\d+)min)?\s*(?:(\d+)sec)?\s*@\s*(\d+)(?:-(\d+))?%CS/i);
+    if (m) {
+      const dur = (parseInt(m[1] || 0, 10) * 60) + (parseInt(m[2] || 0, 10));
+      const low = parseInt(m[3], 10) / 100;
+      const high = m[4] ? parseInt(m[4], 10) / 100 : low;
+      const perc = (low + high) / 2;
+      const speed = CS * perc;
+      const pace = 1000 / speed;
+      return { dur, intensity: perc, pace };
+    }
+
+    // Distance-based %CS (e.g., 1k @ 95%CS)
+    m = str.match(/(\d+)(m|km)\s*@\s*(\d+)(?:-(\d+))?%CS/i);
+    if (m) {
+      const dist = parseInt(m[1], 10) * (m[2] === "km" ? 1000 : 1);
+      const low = parseInt(m[3], 10) / 100;
+      const high = m[4] ? parseInt(m[4], 10) / 100 : low;
+      const perc = (low + high) / 2;
+      const speed = CS * perc;
+      const pace = 1000 / speed;
+      const dur = dist / speed;
+      return { dur, intensity: perc, pace };
+    }
+
+    // Absolute pace like "5:00/km" (optional: treat as steady)
+    m = str.match(/(?:(\d+)min)?\s*(?:(\d+)sec)?\s*@\s*(\d+):(\d+)\/km/i);
+    if (m) {
+      const dur = (parseInt(m[1] || 0, 10) * 60) + (parseInt(m[2] || 0, 10));
+      const paceSec = parseInt(m[3], 10) * 60 + parseInt(m[4], 10);
+      const speed = 1000 / paceSec;
+      const perc = CS ? speed / CS : 1;
+      return { dur, intensity: perc, pace: paceSec };
+    }
+
+    return null;
+  }
+
+  function updateRunMetrics(speedSeries, cs) {
+    const ap = App.avgSpeed(speedSeries);
+    const ns = App.normalizedSpeed(speedSeries);
+    const vi = ap ? ns / ap : 0;
+    const IF = cs ? ns / cs : 0;
+    const tss = cs ? ((speedSeries.length * ns * IF) / (cs * 3600)) * 100 : 0;
+
+    document.getElementById("run-avg-speed").textContent = ap.toFixed(2);
+    document.getElementById("run-avg-pace").textContent = App.formatPace(1000 / ap);
+    document.getElementById("run-ns").textContent = ns.toFixed(2);
+    document.getElementById("run-ns-pace").textContent = App.formatPace(1000 / ns);
+    document.getElementById("run-vi").textContent = vi.toFixed(2);
+    document.getElementById("run-if").textContent = IF.toFixed(2);
+    document.getElementById("run-tss").textContent = tss.toFixed(0);
+  }
+
+  if (genRunBtn && runCanvas) {
+    genRunBtn.addEventListener("click", () => {
+      if (!CS) return alert("Please calculate Critical Speed (CS) first!");
+
+      const text = document.getElementById("run-session-input").value;
+      const lines = text.split("\n").map(s => s.trim()).filter(Boolean);
+
+      let intervals = [];
+      let sections = [];
+      let cursor = 0;
+
+      lines.forEach(line => {
+        if (line.includes(">>")) {
+          sections.push({ label: line.replace(">>", "").trim(), start: cursor });
+          return;
+        }
+        const repeat = line.match(/(\d+)x\s*\((.+)\)/i);
+        if (repeat) {
+          const reps = parseInt(repeat[1], 10);
+          const block = repeat[2].split(",").map(s => s.trim());
+          for (let r = 0; r < reps; r++) {
+            block.forEach(b => {
+              const iv = parseRunInterval(b);
+              if (!iv) return;
+              intervals.push(iv);
+              cursor += iv.dur;
+            });
+          }
+        } else {
+          const iv = parseRunInterval(line);
+          if (!iv) return;
+          intervals.push(iv);
+          cursor += iv.dur;
+        }
+      });
+
+      if (!intervals.length) return alert("No valid running session lines found.");
+
+      // Build series
+      const bars = [];
+      const speedSeries = [];
+      let t = 0;
+      intervals.forEach(iv => {
+        for (let i = 0; i < iv.dur; i++) {
+          t++;
+          const timeMin = t / 60;
+          const spd = CS * iv.intensity; // m/s
+          speedSeries.push(spd);
+          // color by zone
+          const ratio = iv.intensity;
+          const z = runZones.find(z => ratio >= z.low && ratio < z.high) || runZones[runZones.length - 1];
+          bars.push({ x: timeMin, y: ratio * 100, pace: App.formatPace(1000 / spd), c: z.color });
+        }
+      });
+
+      // section labels as annotations
+      const annotations = {};
+      sections.forEach((s, i) => {
+        const start = s.start / 60;
+        const end = (sections[i + 1]?.start ?? t) / 60;
+        annotations["sec" + i] = {
+          type: "box",
+          xScaleID: "x",
+          yScaleID: "y",
+          xMin: start,
+          xMax: end,
+          yMin: 0,
+          yMax: "max",
+          backgroundColor: "rgba(0,0,0,0.06)",
+          borderWidth: 0,
+          label: { content: s.label, enabled: true, position: "start" },
+          drawTime: "beforeDatasetsDraw",
+        };
+      });
+
+      const ctx = runCanvas.getContext("2d");
+      if (window.runSessionChart) window.runSessionChart.destroy();
+      window.runSessionChart = new Chart(ctx, {
+        type: "bar",
+        data: {
+          datasets: [{
+            label: "Running Intensity (%CS)",
+            data: bars,
+            parsing: false,
+            backgroundColor: bars.map(b => b.c),
+          }]
+        },
+        options: {
+          responsive: true,
+          plugins: {
+            tooltip: {
+              callbacks: {
+                label: (ctx) => `Pace: ${ctx.raw.pace}`
+              }
+            },
+            annotation: { annotations }
+          },
+          scales: {
+            x: { type: "linear", title: { display: true, text: "Time (min)" }, min: 0 },
+            y: { title: { display: true, text: "%CS" }, min: 50, max: 130 }
+          }
+        }
+      });
+
+      // Metrics
+      updateRunMetrics(speedSeries, CS);
+    });
+  }
+
+  // ---------- PDF export (Running) ----------
+  const runPdfBtn = document.getElementById("download-run-pdf");
+  if (runPdfBtn) {
+    runPdfBtn.addEventListener("click", () => {
+      const { jsPDF } = window.jspdf;
+      const doc = new jsPDF("p", "mm", "a4");
+      const name = document.getElementById("cs-name")?.value || "Runner";
+      doc.setFontSize(18);
+      doc.text(`Running Conditioning Report — ${name}`, 14, 20);
+      let y = 30;
+
+      const resultsEl = document.getElementById("run-results");
+      if (resultsEl && resultsEl.innerHTML.trim() !== "") {
+        const tmp = document.createElement("div");
+        tmp.innerHTML = resultsEl.innerHTML;
+        Array.from(tmp.querySelectorAll("p")).forEach((p) => {
+          doc.setFontSize(11);
+          doc.text(p.innerText, 14, y);
+          y += 6;
+        });
+      }
+
+      const plan = document.getElementById("run-session-input").value.trim();
+      if (plan) {
+        doc.addPage();
+        y = 20;
+        doc.setFontSize(14);
+        doc.text("Running Session Plan", 14, y);
+        y += 8;
+        plan.split("\n").forEach((line) => {
+          doc.text(line, 20, y);
+          y += 6;
+        });
+      }
+
+      const cv = document.getElementById("run-session-graph");
+      if (cv && cv.toDataURL) {
+        const img = cv.toDataURL("image/png", 1.0);
+        doc.addPage();
+        doc.addImage(img, "PNG", 15, 20, 180, 90);
+      }
+      doc.save(`${name.replace(/\s+/g, "_")}_Run_Report.pdf`);
+    });
+  }
+});
+
+// ============================================
+// ASR MODULE
+// ============================================
+document.addEventListener("DOMContentLoaded", () => {
+  if (!document.getElementById("ASR")) return;
+
+  const asrForm = document.getElementById("asr-form");
+  if (!asrForm) return;
+
+  asrForm.addEventListener("submit", (e) => {
+    e.preventDefault();
+    const mas = parseFloat(document.getElementById("mas").value);
+    const mxs = parseFloat(document.getElementById("mxs").value);
+    const resultEl = document.querySelector(".asr-results");
+    if (isNaN(mas) || isNaN(mxs) || mxs <= mas) {
+      resultEl.textContent = "Please enter valid MAS and MSS values (MSS must be greater than MAS).";
+      return;
+    }
+    const asr = mxs - mas;
+    resultEl.textContent = `Your ASR is ${asr.toFixed(2)} m/s (MSS ${mxs} - MAS ${mas}).`;
+
+    // Chart
+    let ctx = document.getElementById("asrChart");
+    if (!ctx) {
+      ctx = document.createElement("canvas");
+      ctx.id = "asrChart";
+      document.querySelector(".asr-results-report").appendChild(ctx);
+    }
+    if (window.asrChart && typeof window.asrChart.destroy === "function") {
+  window.asrChart.destroy();
 }
 
 
+if (window.asrChart && typeof window.asrChart.destroy === "function") {
+  window.asrChart.destroy();
+}
+
+const asrValue = mxs - mas;
+
+window.asrChart = new Chart(ctx, {
+  type: "bar",
+  data: {
+    labels: ["Speed Components"],
+    datasets: [
+      {
+        label: "Aerobic (MAS)",
+        data: [mas],
+        backgroundColor: "#4CAF50"
+      },
+      {
+        label: "Anaerobic Reserve (ASR)",
+        data: [asrValue],
+        backgroundColor: "#F44336"
+      }
+    ]
+  },
+  options: {
+    responsive: true,
+    plugins: {
+      title: {
+        display: true,
+        text: "Anaerobic Speed Reserve Breakdown"
+      },
+      legend: {
+        position: "bottom"
+      }
+    },
+    scales: {
+      x: {
+        stacked: true,
+        title: { display: false }
+      },
+      y: {
+        stacked: true,
+        beginAtZero: true,
+        title: { display: true, text: "Speed (m/s)" },
+        suggestedMax: mxs * 1.1
+      }
+    }
+  }
+});
+
+  });
 });

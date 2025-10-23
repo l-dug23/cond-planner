@@ -16,7 +16,7 @@
 	<img src="logo.jpg" alt="graph of critical power">
 	<figcaption>
 		Figure 1. The two-parameter model. a the hyperbolic form and b the liner transformation with critical power (CP) as the y-intercept and curvature constant (W') as the slope <span class="highlight">(Sreedhara et al. Sports Medicine, 2019)</span>
-	</figure>
+	</figcaption></figure>
 	<p class="description">Physically profile you or your athlete(s). Create graphs of your sessions with target time at certain pace/power/HR zones and predict load and intensity from session. Build 	progressions and review effectiveness. Graph actute:chronic training loads and fitness:fatigue:Freshness over time</p>
 <nav>
   <ul>
@@ -54,16 +54,16 @@
 	<p class="forminput">Enter your peak numbers (avg. watts) for analysis here:</p>
 	<label for="name">Name</label>
 	<input type="text" id="cp-name" name="name" placeholder="Lee Douglas" maxlength="12">
-	<label for="1min">1min Watts:</label>
-	<input type="number" id="1min" name="1min" placeholder="400" min="1" max="2000">
-	<label for="3min">3min Watts:</label>
-	<input type="number" id="3min" name="3min" placeholder="350" min="1" max="2000">
-	<label for="6min">6min Watts:</label>
-	<input type="number" id="6min" name="6min" placeholder="300" min="1" max="2000">
-	<label for="12min">12min Watts:</label>
-	<input type="number" id="12min" name="12min" placeholder="290" min="1" max="2000">
-	<label for="20min">20min Watts:</label>
-	<input type="number" id="20min" name="20min" placeholder="270" min="1" max="2000" required>
+	<label for="p1min">1min Watts:</label>
+	<input type="number" id="p1min" name="1min" placeholder="400" min="1" max="2000">
+	<label for="p3min">3min Watts:</label>
+	<input type="number" id="p3min" name="3min" placeholder="350" min="1" max="2000">
+	<label for="p6min">6min Watts:</label>
+	<input type="number" id="p6min" name="6min" placeholder="300" min="1" max="2000">
+	<label for="p12min">12min Watts:</label>
+	<input type="number" id="p12min" name="12min" placeholder="290" min="1" max="2000">
+	<label for="p20min">20min Watts:</label>
+	<input type="number" id="p20min" name="20min" placeholder="270" min="1" max="2000" required>
 	<br>
 	<button type="button" id="save-athlete">Save Athlete Data</button>
 	<label for="athlete-select">Recall saved athlete:</label>
@@ -71,15 +71,18 @@
 		<option value="">Select athlete</option></select>
 	<br>
 	<p>Select which model to use:</p>
-	<label><input type="radio" name="Model" value="2pModel" checked>2P model</label>
-	<label><input type="radio" name="Model" value="3pModel">3P model</label>
+	<label><input type="radio" name="cycleModel" value="2pModel" checked>2P model</label>
+	<label><input type="radio" name="cycleModel" value="3pModel">3P model</label>
 	<button type="submit">Calculate</button>
 	</form>
 
-<hr></hr>
+<hr>
 	<h3>2. Results and Training Zones</h3>
 	<p id="results"></p>
-<hr></hr>
+	<div id="cycle-predictions"></div>
+<div id="cycle-zones" class="zone-table"></div>
+
+<hr>
 	<h3>3. Plan sessions based of profiling</h3>
 	<p>Select which marker to use for training</p>
 	<form id="train-select">
@@ -122,7 +125,7 @@
 <!--ability to export raw workout to go into zwift / garmin etc-->
 
 </section>
-<hr></hr>
+<hr>
 
 <section id="running">
 	<h2>Running<img src="Running.svg" style="height:20px; vertical-align:middle; margin-left:10px;" alt="picture of running"></h2>
@@ -140,7 +143,7 @@
 	<form id="cs-form">
 	<p class="forminput">Enter your peak numbers (avg. pace/km) for analysis here:</p>
 	<label for="name">Name</label>
-	<input type="text" id="cs-name" name="name" placeholder="Lee Douglas" maxlength="12">
+	<input type="text" id="cs-name" name="name" placeholder="Lee Douglas" maxlength="15">
 	<label for="1km">1km Pace:</label>
 	<input type="time" id="1km" name="1km" step="1" placeholder="03:30" min="0:01" max="20:00">
 	<label for="3km">3km Pace:</label>
@@ -154,11 +157,14 @@
 	<label><input type="radio" name="Model" value="3pModel">3P model</label>
 	<button type="submit">Calculate</button>
 	</form>
-<hr></hr>
+<hr>
 
 	<h3>2. Results and Training Zones</h3>
 	<p id="run-results"></p>
-<hr></hr>
+	<div id="run-predictions"></div>
+<div id="run-zones" class="zone-table"></div>
+
+<hr>
   	<h3>3. Plan running sessions based on profiling</h3>
   	<textarea id="run-session-input" rows="6" cols="50" placeholder="e.g.
 	warm up>>
@@ -174,7 +180,7 @@
 	<button id="download-run-pdf">Download Run PDF</button>
 	</div>
 
-<hr></hr>
+<hr>
 
 <div class="run-metric-box">
   <h3>Running Session Metrics</h3>
@@ -192,12 +198,37 @@
 
 <section id="ASR">
 	<h2>Anaerobic Speed Reserve (ASR)</h2>
+	<h3>1. Calculate anaerobic speed reserve and produce predicted times/distances for certain efforts for training</h3>
+	<div class="asr-metric-input">
+		<form id="asr-form">
+<p class="asr-form-input">Enter your maximal aerobic speed (m/s) and maximum speed (m/s) to calculate ASR</p>
+<label for="mas">Maximal Aerobic Speed (m/s)</label>
+<input type="number" id="mas" name="mas" placeholder="3.5" step="0.1" max="15">
+<label for="mxs">Maximum Speed (m/s)</label>
+<input type="number" id="mxs" name="mxs" placeholder="9.5" step="0.1" max="15">
+<button type="submit">Calculate</button>
+		</form>
+	</div>
+
+<hr>
+
+<div class="asr-results-report">
+	<h3>2. Results</h3>
+	<p class="asr-results"></p>
+	</div>
+
+<hr>
+
+<div class="asr-workout-builder">
+<h3>3. Plan Workouts</h3>
+</div>
+
 </section>
 
 <hr>
 
 <section id="RSA">
-<h2>Repeat Sprint Ability (RSA)</h2>
+<h3>Repeat Sprint Ability (RSA)</h3>
 </section>
 
 </main>
