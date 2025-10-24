@@ -759,11 +759,65 @@ if (pdfBtn) {
 
 
 
-  // ---------- Unimplemented exports (ZWO / FIT) ----------
-  const zwoBtn = document.getElementById("export-.zwo");
-  const fitBtn = document.getElementById("export-.fit");
-  if (zwoBtn) zwoBtn.addEventListener("click", () => alert("ZWO export coming soon."));
-  if (fitBtn) fitBtn.addEventListener("click", () => alert(".FIT export coming soon."));
+// ---------- Functional ZWO / FIT Exports ----------
+const zwoBtn = document.getElementById("export-.zwo");
+const fitBtn = document.getElementById("export-.fit");
+
+if (zwoBtn) {
+  zwoBtn.addEventListener("click", () => {
+    const text = document.getElementById("session-input").value.trim();
+    if (!text) return alert("Please enter or generate a session first.");
+    if (!CP || !FTP) return alert("Please calculate CP/FTP first.");
+
+    // Parse the same text you use for the graph
+    const baseChoice = document.querySelector('#train-select input[name="trainBase"]:checked')?.value || "CP";
+    const base = baseChoice === "CP" ? CP : FTP;
+    const lines = text.split("\n").map(s => s.trim()).filter(Boolean);
+
+    let intervals = [];
+    lines.forEach(line => {
+      const repeat = line.match(/(\d+)x\s*\((.+)\)/i);
+      if (repeat) {
+        const reps = parseInt(repeat[1], 10);
+        const block = repeat[2].split(",").map(s => s.trim());
+        for (let r = 0; r < reps; r++) {
+          block.forEach(b => {
+            const parsed = parseCycleInterval(b, base);
+            if (parsed?.dur && parsed?.power) intervals.push(parsed);
+          });
+        }
+      } else {
+        const parsed = parseCycleInterval(line, base);
+        if (parsed?.dur && parsed?.power) intervals.push(parsed);
+      }
+    });
+
+    if (!intervals.length) return alert("No valid session found.");
+
+    // Build ZWO XML
+    let xml = `<?xml version="1.0" encoding="UTF-8"?>\n<workout_file>\n`;
+    xml += `  <author>Jenni Douglas Coaching</author>\n`;
+    xml += `  <name>${document.getElementById("session-name")?.value || "Cycling Workout"}</name>\n`;
+    xml += `  <description>Generated from CP/FTP tool</description>\n`;
+    xml += `  <sportType>bike</sportType>\n`;
+    xml += `  <tags>\n    <tag name="Custom"/>\n  </tags>\n`;
+    xml += `  <workout>\n`;
+
+    intervals.forEach(iv => {
+      const target = iv.power / FTP; // Zwift expects FTP fractions
+      xml += `    <SteadyState Duration="${iv.dur}" Power="${target.toFixed(2)}"/>\n`;
+    });
+
+    xml += `  </workout>\n</workout_file>`;
+
+    // Download as .zwo
+    const blob = new Blob([xml], { type: "application/xml" });
+    const a = document.createElement("a");
+    a.href = URL.createObjectURL(blob);
+    a.download = `${(document.getElementById("session-name")?.value || "session")}.zwo`;
+    a.click();
+  });
+}
 });
 
 // ============================================
