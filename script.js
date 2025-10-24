@@ -939,22 +939,43 @@ document.getElementById("run-zones").innerHTML = zoneRunHtml;
 
       if (!intervals.length) return alert("No valid running session lines found.");
 
-      // Build series
-      const bars = [];
-      const speedSeries = [];
-      let t = 0;
-      intervals.forEach(iv => {
-        for (let i = 0; i < iv.dur; i++) {
-          t++;
-          const timeMin = t / 60;
-          const spd = CS * iv.intensity; // m/s
-          speedSeries.push(spd);
-          // color by zone
-          const ratio = iv.intensity;
-          const z = runZones.find(z => ratio >= z.low && ratio < z.high) || runZones[runZones.length - 1];
-          bars.push({ x: timeMin, y: ratio * 100, pace: App.formatPace(1000 / spd), c: z.color });
-        }
-      });
+      // Build series + D′bal (Skiba-style)
+const bars = [];
+const speedSeries = [];
+const dBalPoints = [];
+const dt = 1;                      // 1 s sampling (matches your other code)
+let t = 0;
+let dBal = DPRIME ?? 0;            // start full D′
+
+intervals.forEach(iv => {
+  for (let i = 0; i < iv.dur; i++) {
+    t++;
+    const timeMin = t / 60;
+    const spd = CS * iv.intensity;   // m/s for this second
+    speedSeries.push(spd);
+
+    // --- Deplete/recover D′ like your cycling W′bal heuristic ---
+    if (spd > CS) {
+      // above CS → deplete by (v - CS) * dt  (metres per second * s = metres)
+      dBal -= (spd - CS) * dt;
+    } else {
+      // below CS → recover; bounded, a simple exponential-like term
+      // same shape as your cycling code; tweak factor (0.5) if you want slower/faster recovery
+      const recover = (CS - spd) * dt * (1 - dBal / (DPRIME || 1)) * 0.5;
+      dBal += recover;
+    }
+    dBal = Math.max(0, Math.min(dBal, DPRIME || 0));
+
+    // bar for %CS
+    const ratio = iv.intensity;
+    const z = runZones.find(z => ratio >= z.low && ratio < z.high) || runZones[runZones.length - 1];
+    bars.push({ x: timeMin, y: ratio * 100, pace: App.formatPace(1000 / spd), c: z.color });
+
+    // D′bal trace (metres)
+    dBalPoints.push({ x: timeMin, y: dBal });
+  }
+});
+
 
       // section labels as annotations
       const annotations = {};
@@ -976,33 +997,81 @@ document.getElementById("run-zones").innerHTML = zoneRunHtml;
         };
       });
 
+      // === Add a dotted line at 100% CS ===
+annotations["csLine"] = {
+  type: "line",
+  xScaleID: "x",
+  yScaleID: "y1",     // attach to the %CS axis
+  yMin: 100,
+  yMax: 100,
+  borderColor: "rgba(0, 0, 0, 0.6)", // greyish tone
+  borderWidth: 1.5,
+  borderDash: [6, 4], // dotted line
+  label: {
+    display: true,
+    content: "100% CS",
+    position: "end",
+    backgroundColor: "rgba(255,255,255,0.7)",
+    color: "black",
+    font: { size: 11, style: "italic" },
+  },
+  drawTime: "afterDatasetsDraw",
+};
+
       const ctx = runCanvas.getContext("2d");
       if (window.runSessionChart) window.runSessionChart.destroy();
       window.runSessionChart = new Chart(ctx, {
         type: "bar",
-        data: {
-          datasets: [{
-            label: "Running Intensity (%CS)",
-            data: bars,
-            parsing: false,
-            backgroundColor: bars.map(b => b.c),
-          }]
-        },
-        options: {
-          responsive: true,
-          plugins: {
-            tooltip: {
-              callbacks: {
-                label: (ctx) => `Pace: ${ctx.raw.pace}`
-              }
-            },
-            annotation: { annotations }
-          },
-          scales: {
-            x: { type: "linear", title: { display: true, text: "Time (min)" }, min: 0 },
-            y: { title: { display: true, text: "%CS" }, min: 50, max: 130 }
+    data: {
+  datasets: [
+    {
+      label: "Running Intensity (%CS)",
+      data: bars,
+      parsing: false,
+      backgroundColor: bars.map(b => b.c),
+      yAxisID: "y1"
+    },
+    {
+      label: "D′bal (m)",
+      data: dBalPoints,
+      type: "line",
+      parsing: false,
+      borderColor: "red",
+      borderWidth: 2,
+      pointRadius: 0,
+      yAxisID: "y2"
+    }
+  ]
+},
+options: {
+  responsive: true,
+  plugins: {
+    tooltip: {
+      callbacks: {
+        label: (ctx) => {
+          if (ctx.dataset.label.startsWith("Running")) {
+            return `Pace: ${ctx.raw.pace}`;
           }
+          return `D′bal: ${ctx.raw.y.toFixed(0)} m`;
         }
+      }
+    },
+    annotation: { annotations }
+  },
+  scales: {
+    x: { type: "linear", title: { display: true, text: "Time (min)" }, min: 0 },
+    y1: { title: { display: true, text: "%CS" }, min: 50, max: 130 },
+    y2: {
+      position: "right",
+      title: { display: true, text: "D′bal (m)" },
+      min: 0,
+      max: DPRIME || undefined,
+      beginAtZero: true,
+      grid: { drawOnChartArea: false }
+    }
+  }
+}
+
       });
 
       // Metrics

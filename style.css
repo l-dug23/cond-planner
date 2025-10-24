@@ -6,7 +6,7 @@ table { border-collapse: collapse; margin:10px 0; background-color: white; margi
 
 /* Background colour and width setting*/
 body {
-background: linear-gradient(to right, rgb(172, 171, 171), rgb(235, 214, 97));
+background: linear-gradient(to right, rgb(172, 171, 171), orange);
 font-family: open-sans;
 font-size: 22px;
 text-align: center;
