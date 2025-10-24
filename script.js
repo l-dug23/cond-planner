@@ -436,24 +436,40 @@ if (zoneDiv) zoneDiv.innerHTML = zoneHtml;
         return acc + iv.dur;
       }, 0);
 
-      sections.forEach((s, i) => {
-        const start = s.start / 60;
-        const end = (sections[i + 1]?.start ?? cursor) / 60;
-        annotations["sec" + i] = {
-          type: "box",
-          xScaleID: "x",
-          yScaleID: "y1",
-          xMin: start,
-          xMax: end,
-          yMin: 0,
-          yMax: "max",
-          backgroundColor: "rgba(0,0,0,0.06)",
-          borderWidth: 0,
-          label: { content: s.label, enabled: true, position: "start" },
-          drawTime: "beforeDatasetsDraw",
-        };
-      });
+      // --- Section background + labels (Warm-up, Main Set, Cool Down)
+sections.forEach((s, i) => {
+  const start = s.start / 60;
+  const end = (sections[i + 1]?.start ?? cursor) / 60;
+  const colors = [
+    "rgba(113, 216, 116, 0.15)", // green tint - warm up
+    "rgba(232, 130, 100, 0.15)", // orange tint - main set
+    "rgba(100, 181, 246, 0.15)"  // blue tint - cool down
+  ];
+  const labelColors = ["#388e3c", "#c62828", "#1565c0"];
+  const bg = colors[i % colors.length];
+  const textColor = labelColors[i % labelColors.length];
 
+  annotations[`sec_${i}`] = {
+    type: "box",
+    xScaleID: "x",
+    yScaleID: "y1",
+    xMin: start,
+    xMax: end,
+    yMin: 0,
+    yMax: "max",
+    backgroundColor: bg,
+    borderWidth: 0,
+    drawTime: "beforeDatasetsDraw",
+    label: {
+      display: true,
+      content: s.label,
+      position: "start",
+      yAdjust: -15,
+      color: textColor,
+      font: { weight: "bold", size: 13 }
+    },
+  };
+});
 
       // Draw chart
       const ctx = canvas.getContext("2d");
@@ -491,9 +507,35 @@ if (zoneDiv) zoneDiv.innerHTML = zoneHtml;
     },
 
     plugins: {
-      annotation: { annotations },
-      legend: { position: "top" } // optional, keeps legend above graph
+  annotation: {
+    annotations: {
+      // Existing section boxes (reuse parsed sections)
+      ...annotations,
+
+      // Add a dotted CP reference line
+      cpLine: {
+        type: "line",
+        yScaleID: "y1",
+        yMin: CP,
+        yMax: CP,
+        borderColor: "#1E4696",
+        borderWidth: 2,
+        borderDash: [6, 6],
+        label: {
+          display: true,
+          content: "Critical Power",
+          position: "end",
+          backgroundColor: "rgba(30,70,150,0.1)",
+          color: "#1E4696",
+          font: { weight: "bold", size: 11 },
+          yAdjust: -6
+        },
+      },
     },
+  },
+  legend: { position: "top" },
+},
+
 
     scales: {
       x: { type: "linear", title: { display: true, text: "Time (min)" }, min: 0 },
@@ -508,6 +550,58 @@ if (zoneDiv) zoneDiv.innerHTML = zoneHtml;
       updateCycleMetrics(powerSeries, CP);
     });
   }
+
+// ---------- Save / Recall Session Text ----------
+const saveSessionBtn = document.getElementById("save-session");
+const sessionSelect = document.getElementById("session-select");
+const sessionInput = document.getElementById("session-input");
+
+function updateSessionList() {
+  sessionSelect.innerHTML = "<option value=''>Select session</option>";
+  Object.keys(localStorage)
+    .filter(k => k.startsWith("cycle_session_"))
+    .forEach(key => {
+      const name = key.replace("cycle_session_", "");
+      const opt = document.createElement("option");
+      opt.value = name;
+      opt.textContent = name;
+      sessionSelect.appendChild(opt);
+    });
+}
+
+// Populate dropdown on load
+updateSessionList();
+
+// --- Save Session ---
+if (saveSessionBtn) {
+  saveSessionBtn.addEventListener("click", e => {
+    e.preventDefault();
+    const name = document.getElementById("session-name").value.trim();
+    const text = sessionInput.value.trim();
+    if (!name) return alert("Please enter a session name.");
+    if (!text) return alert("Please enter session text before saving.");
+
+    localStorage.setItem("cycle_session_" + name, text);
+    updateSessionList();
+    sessionSelect.value = name;
+    alert("Saved session: " + name);
+  });
+}
+
+// --- Load Session ---
+if (sessionSelect) {
+  sessionSelect.addEventListener("change", () => {
+    const sel = sessionSelect.value;
+    if (!sel) return;
+    const text = localStorage.getItem("cycle_session_" + sel);
+    if (text) {
+      sessionInput.value = text;
+      alert("Loaded session: " + sel);
+    }
+  });
+}
+
+
 
 // ---------- Enhanced PDF export (Cycling – Professional Layout) ----------
 const pdfBtn = document.getElementById("download-pdf");
@@ -834,11 +928,11 @@ document.getElementById("run-zones").innerHTML = zoneRunHtml;
   const runCanvas = document.getElementById("run-session-graph");
 
   const runZones = [
-    { name: "Z1", low: 0.0, high: 0.80, color: "#c8e6c9" },
-    { name: "Z2", low: 0.80, high: 0.90, color: "#fff9c4" },
-    { name: "Z3", low: 0.90, high: 1.00, color: "#ffe082" },
-    { name: "Z4", low: 1.00, high: 1.05, color: "#ffccbc" },
-    { name: "Z5", low: 1.05, high: Infinity, color: "#ef9a9a" },
+    { name: "Z1", low: 0.0, high: 0.80, color: "#7fd282ff" },
+    { name: "Z2", low: 0.80, high: 0.90, color: "#e7dc74ff" },
+    { name: "Z3", low: 0.90, high: 1.00, color: "#eac042ff" },
+    { name: "Z4", low: 1.00, high: 1.05, color: "#ea9378ff" },
+    { name: "Z5", low: 1.05, high: Infinity, color: "#e45959ff" },
   ];
   window.runZones = runZones; // for tooltip coloring
 
@@ -1078,6 +1172,57 @@ options: {
       updateRunMetrics(speedSeries, CS);
     });
   }
+
+// ---------- Save / Recall Run Session Text ----------
+const runSaveSessionBtn = document.getElementById("run-save-session");
+const runSessionSelect = document.getElementById("run-session-select");
+const runSessionInput = document.getElementById("run-session-input");
+
+function updateRunSessionList() {
+  runSessionSelect.innerHTML = "<option value=''>Select session</option>";
+  Object.keys(localStorage)
+    .filter(k => k.startsWith("run_session_"))
+    .forEach(key => {
+      const name = key.replace("run_session_", "");
+      const opt = document.createElement("option");
+      opt.value = name;
+      opt.textContent = name;
+      runSessionSelect.appendChild(opt);
+    });
+}
+
+// Populate dropdown on load
+updateRunSessionList();
+
+// --- Save Run Session ---
+if (runSaveSessionBtn) {
+  runSaveSessionBtn.addEventListener("click", e => {
+    e.preventDefault();
+    const name = document.getElementById("run-session-name").value.trim();
+    const text = runSessionInput.value.trim();
+    if (!name) return alert("Please enter a session name.");
+    if (!text) return alert("Please enter session text before saving.");
+
+    localStorage.setItem("run_session_" + name, text);
+    updateRunSessionList();
+    runSessionSelect.value = name;
+    alert("Saved run session: " + name);
+  });
+}
+
+// --- Load Run Session ---
+if (runSessionSelect) {
+  runSessionSelect.addEventListener("change", () => {
+    const sel = runSessionSelect.value;
+    if (!sel) return;
+    const text = localStorage.getItem("run_session_" + sel);
+    if (text) {
+      runSessionInput.value = text;
+      alert("Loaded run session: " + sel);
+    }
+  });
+}
+
 
 // ---------- PDF export (Running) ----------
 const runPdfBtn = document.getElementById("download-run-pdf");

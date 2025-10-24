@@ -98,10 +98,14 @@
 	Cool Down>>
 	10min @ 55%"></textarea>
 	<br>
-	<button id="session-save">Save Session</button>
-	<label for="session-select"></label>
-	<select id="session-select">
-		<option value="">Select session</option></select>
+<div class="session-save-controls" style="margin-bottom:10px;">
+  <input type="text" id="session-name" placeholder="Session name" style="width:180px;">
+  <button id="save-session" class="btn">Save Session</button>
+  <select id="session-select">
+    <option value="">Select session</option>
+  </select>
+</div>
+
 <br>
 	<div class="session-graph">
 	<button id="generate-session">Generate Graph</button>
@@ -178,6 +182,14 @@
 	6x (3min @ 110%CS, 2min @ 80%CS)
 	Cool Down>>
 	20min @ 5:30/km"></textarea>
+	<br>
+	<div class="run-session-save-controls" style="margin-bottom:10px;">
+  <input type="text" id="run-session-name" placeholder="Session name" style="width:180px;">
+  <button id="run-save-session" class="btn">Save Session</button>
+  <select id="run-session-select">
+    <option value="">Select session</option>
+  </select>
+</div>
   <br>
 	<div class="session-graph">
   	<button id="generate-run-session">Generate Running Graph</button>
@@ -214,7 +226,6 @@
 <button type="submit">Calculate</button>
 		</form>
 	</div>
-
 <hr>
 
 <div class="asr-results-report">
