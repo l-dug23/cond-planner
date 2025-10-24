@@ -6,7 +6,7 @@ table { border-collapse: collapse; margin:10px 0; background-color: white; margi
 
 /* Background colour and width setting*/
 body {
-background: linear-gradient(to right, rgb(172, 171, 171), orange);
+background: linear-gradient(to right, rgb(172, 171, 171), rgba(230, 62, 62, 0.445));
 font-family: open-sans;
 font-size: 22px;
 text-align: center;
@@ -68,8 +68,8 @@ border-color: black;
 
 /* Button Styling*/
 input, select, button {
-background: rgb(53, 55, 211);
-color: white;
+background: rgb(76, 238, 168);
+color: rgb(0, 0, 0);
 border-color: rgb(53, 55, 211);
 padding:0.5rem 0.75rem;
 border-radius: 10px;
@@ -133,7 +133,7 @@ nav ul {
 
 /* Nav container */
 nav {
-  background: rgb(63, 71, 234);           /* dark background */
+  background: rgba(63, 72, 234, 0.447);          
   padding: 0.75rem 1.5rem;
   position: sticky;           /* stays at top when scrolling */
   top: 0;
