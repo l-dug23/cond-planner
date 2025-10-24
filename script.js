@@ -1320,6 +1320,88 @@ window.asrChart = new Chart(ctx, {
     }
   }
 });
+// === Predicted Distances at %ASR (30%→80%) for durations 20–100s ===
+const percentSteps = [30, 40, 50, 60, 70, 80];     // %ASR columns
+const durations = [20, 40, 60, 80, 100];           // seconds
+
+let tableHtml = `
+  <h4>Predicted Distance by %ASR</h4>
+  <table style="border-collapse:collapse;width:100%;text-align:center;font-size:13px">
+    <thead>
+      <tr>
+        <th style="background:#1E4696;color:#fff;padding:6px 4px">Duration (s)</th>
+        ${percentSteps.map(p => `<th style="background:#1E4696;color:#fff;padding:6px 4px">${p}% ASR</th>`).join("")}
+      </tr>
+    </thead>
+    <tbody>
+      ${durations.map((t,iRow) => {
+        const rowBg = iRow % 2 ? "#f7f7f7" : "#ffffff";
+        return `
+          <tr style="background:${rowBg}">
+            <td style="padding:6px 4px"><strong>${t}</strong></td>
+            ${percentSteps.map(p => {
+              const pct = p / 100;
+              const speed = mas + asr * pct;      // m/s  => MAS + %ASR * ASR
+              const dist = speed * t;             // meters
+              return `<td style="padding:6px 4px">${dist.toFixed(1)} m</td>`;
+            }).join("")}
+          </tr>
+        `;
+      }).join("")}
+    </tbody>
+  </table>
+`;
+
+// append under the ASR results section
+const asrSection = document.querySelector(".asr-results-report");
+if (asrSection) {
+  // remove a previous table if present, so we don’t duplicate on recalcs
+  const old = asrSection.querySelector(".asr-distance-table");
+  if (old) old.remove();
+  const wrap = document.createElement("div");
+  wrap.className = "asr-distance-table";
+  wrap.innerHTML = tableHtml;
+  asrSection.appendChild(wrap);
+}
+// === Predicted Times for Set Distances at %ASR (30→80%) ===
+const distanceList = [50, 100, 150, 200];    // metres
+const asrPercents = [30, 40, 50, 60, 70, 80];
+
+let timeTableHtml = `
+  <h4>Predicted Time to Cover Distance by %ASR</h4>
+  <table style="border-collapse:collapse;width:100%;text-align:center;font-size:13px;margin-top:10px">
+    <thead>
+      <tr>
+        <th style="background:#1E4696;color:#fff;padding:6px 4px">Distance (m)</th>
+        ${asrPercents.map(p => `<th style="background:#1E4696;color:#fff;padding:6px 4px">${p}% ASR</th>`).join("")}
+      </tr>
+    </thead>
+    <tbody>
+      ${distanceList.map((d, iRow) => {
+        const bg = iRow % 2 ? "#f7f7f7" : "#ffffff";
+        return `
+          <tr style="background:${bg}">
+            <td style="padding:6px 4px"><strong>${d}</strong></td>
+            ${asrPercents.map(p => {
+              const pct = p / 100;
+              const speed = mas + asr * pct;
+              const time = d / speed; // seconds
+              return `<td style="padding:6px 4px">${time.toFixed(1)} s</td>`;
+            }).join("")}
+          </tr>
+        `;
+      }).join("")}
+    </tbody>
+  </table>
+`;
+
+const asrResults = document.querySelector(".asr-results-report");
+if (asrResults) {
+  const wrap = document.createElement("div");
+  wrap.className = "asr-time-table";
+  wrap.innerHTML = timeTableHtml;
+  asrResults.appendChild(wrap);
+}
 
   });
 });
