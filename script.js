@@ -1079,51 +1079,165 @@ options: {
     });
   }
 
-  // ---------- PDF export (Running) ----------
-  const runPdfBtn = document.getElementById("download-run-pdf");
-  if (runPdfBtn) {
-    runPdfBtn.addEventListener("click", () => {
-      const { jsPDF } = window.jspdf;
-      const doc = new jsPDF("p", "mm", "a4");
-      const name = document.getElementById("cs-name")?.value || "Runner";
-      doc.setFontSize(18);
-      doc.text(`Running Conditioning Report — ${name}`, 14, 20);
-      let y = 30;
+// ---------- PDF export (Running) ----------
+const runPdfBtn = document.getElementById("download-run-pdf");
+if (runPdfBtn) {
+  runPdfBtn.addEventListener("click", async () => {
+    const { jsPDF } = window.jspdf;
+    const doc = new jsPDF("p", "mm", "a4");
+    const name = document.getElementById("cs-name")?.value || "Runner";
 
-      const resultsEl = document.getElementById("run-results");
-      if (resultsEl && resultsEl.innerHTML.trim() !== "") {
-        const tmp = document.createElement("div");
-        tmp.innerHTML = resultsEl.innerHTML;
-        Array.from(tmp.querySelectorAll("p")).forEach((p) => {
-          doc.setFontSize(11);
-          doc.text(p.innerText, 14, y);
+    // === TITLE HEADER ===
+    doc.setFont("helvetica", "bold");
+    doc.setFontSize(18);
+    doc.setTextColor(30, 70, 150);
+    doc.text(`Running Performance Report — ${name}`, 14, 20);
+
+    let y = 30;
+
+    // === PERFORMANCE PROFILE ===
+    const resultsEl = document.getElementById("run-results");
+    if (resultsEl && resultsEl.innerHTML.trim() !== "") {
+      doc.setFont("helvetica", "bold");
+      doc.setFontSize(14);
+      doc.setTextColor(30, 70, 150);
+      doc.text("Performance Profile", 14, y);
+      y += 8;
+
+      doc.setFont("helvetica", "normal");
+      doc.setFontSize(12);
+      doc.setTextColor(0, 0, 0);
+
+      const tmp = document.createElement("div");
+      tmp.innerHTML = resultsEl.innerHTML;
+      const lines = tmp.innerText.split("\n").filter(l => l.trim() !== "");
+      lines.forEach(line => {
+        doc.text(line, 16, y);
+        y += 6;
+      });
+    }
+
+    // === PREDICTED PACES TABLE ===
+    const predEl = document.getElementById("run-predictions");
+    if (predEl && y < 250) {
+      y += 8;
+      doc.setFont("helvetica", "bold");
+      doc.setFontSize(14);
+      doc.setTextColor(30, 70, 150);
+      doc.text("Predicted Paces & D′ Use", 14, y);
+      y += 6;
+
+      const tmp = document.createElement("div");
+      tmp.innerHTML = predEl.innerHTML;
+      const rows = Array.from(tmp.querySelectorAll("tr"));
+      doc.setFont("helvetica", "normal");
+      doc.setFontSize(10);
+      rows.forEach((row, i) => {
+        const cols = Array.from(row.querySelectorAll("td,th")).map(td => td.innerText.trim());
+        if (cols.length) {
+          if (i === 0) {
+            doc.setFillColor(220, 230, 250);
+            doc.rect(14, y - 4, 180, 6, "F");
+            doc.setFont("helvetica", "bold");
+          } else {
+            if (i % 2 === 0) {
+              doc.setFillColor(245, 245, 245);
+              doc.rect(14, y - 4, 180, 6, "F");
+            }
+            doc.setFont("helvetica", "normal");
+          }
+          doc.text(cols.join("   "), 16, y);
           y += 6;
-        });
-      }
+        }
+        if (y > 270) {
+          doc.addPage();
+          y = 20;
+        }
+      });
+    }
 
-      const plan = document.getElementById("run-session-input").value.trim();
-      if (plan) {
-        doc.addPage();
-        y = 20;
-        doc.setFontSize(14);
-        doc.text("Running Session Plan", 14, y);
-        y += 8;
-        plan.split("\n").forEach((line) => {
-          doc.text(line, 20, y);
+    // === RUNNING ZONES ===
+    const zonesEl = document.getElementById("run-zones");
+    if (zonesEl) {
+      y += 8;
+      doc.setFont("helvetica", "bold");
+      doc.setFontSize(14);
+      doc.setTextColor(30, 70, 150);
+      doc.text("Running Zones", 14, y);
+      y += 6;
+
+      const tmp = document.createElement("div");
+      tmp.innerHTML = zonesEl.innerHTML;
+      const rows = Array.from(tmp.querySelectorAll("tr"));
+      doc.setFont("helvetica", "normal");
+      doc.setFontSize(10);
+      rows.forEach((row, i) => {
+        const cols = Array.from(row.querySelectorAll("td,th")).map(td => td.innerText.trim());
+        if (cols.length) {
+          if (i === 0) {
+            doc.setFillColor(220, 230, 250);
+            doc.rect(14, y - 4, 180, 6, "F");
+            doc.setFont("helvetica", "bold");
+          } else {
+            if (i % 2 === 0) {
+              doc.setFillColor(245, 245, 245);
+              doc.rect(14, y - 4, 180, 6, "F");
+            }
+            doc.setFont("helvetica", "normal");
+          }
+          doc.text(cols.join("   "), 16, y);
           y += 6;
-        });
-      }
+        }
+        if (y > 270) {
+          doc.addPage();
+          y = 20;
+        }
+      });
+    }
 
-      const cv = document.getElementById("run-session-graph");
-      if (cv && cv.toDataURL) {
-        const img = cv.toDataURL("image/png", 1.0);
-        doc.addPage();
-        doc.addImage(img, "PNG", 15, 20, 180, 90);
-      }
-      doc.save(`${name.replace(/\s+/g, "_")}_Run_Report.pdf`);
-    });
-  }
+    // === SESSION PLAN ===
+    const plan = document.getElementById("run-session-input").value.trim();
+    if (plan) {
+      doc.addPage();
+      y = 20;
+      doc.setFont("helvetica", "bold");
+      doc.setFontSize(14);
+      doc.setTextColor(30, 70, 150);
+      doc.text("Session Plan", 14, y);
+      y += 8;
+
+      doc.setFont("helvetica", "normal");
+      doc.setFontSize(11);
+      doc.setTextColor(0, 0, 0);
+      plan.split("\n").forEach((line) => {
+        doc.text(line, 20, y);
+        y += 6;
+        if (y > 270) {
+          doc.addPage();
+          y = 20;
+        }
+      });
+    }
+
+    // === ADD GRAPH ===
+    const cv = document.getElementById("run-session-graph");
+    if (cv && cv.toDataURL) {
+      doc.addPage();
+      const img = cv.toDataURL("image/png", 1.0);
+      doc.addImage(img, "PNG", 15, 25, 180, 90);
+      doc.setFont("helvetica", "italic");
+      doc.setFontSize(10);
+      doc.setTextColor(100);
+      doc.text("Running Session Graph — Intensity (%CS) and D′ Balance", 15, 120);
+    }
+
+    // === SAVE ===
+    doc.save(`${name.replace(/\s+/g, "_")}_Running_Report.pdf`);
+  });
+}
+
 });
+
 
 // ============================================
 // ASR MODULE
