@@ -47,7 +47,17 @@
 
 <main class="content">
 <section id="cycling">
-	<h2>Cycling<img src="cycling.svg" style="height:20px; vertical-align:middle; margin-left:10px;" alt="picture of cycling"></h2>
+	<!-- <h2>Cycling<img src="cycling.svg" style="height:20px; vertical-align:middle; margin-left:10px;" alt="picture of cycling"></h2> -->
+	 <h2>Cycling
+		<div class="wheel">
+      <span class="line"></span>
+      <span class="line"></span>
+      <span class="line"></span>
+      <span class="line"></span>
+      <span class="line"></span>
+      <span class="line"></span>
+    </div>
+	 </h2>
 	<h3>1. Physical Profiling: Basic FTP and advanced CP and W'</h3>
 	<p class="description">Using either 2 or 3 parameter models calculate CP and W' and predict potential outputs for certain time domains. Generate training zones and estimate 	physiological 	thresholds</p>
 
@@ -226,9 +236,9 @@
 		<form id="asr-form">
 <p class="asr-form-input">Enter your maximal aerobic speed (m/s) and maximum speed (m/s) to calculate ASR</p>
 <label for="mas">Maximal Aerobic Speed (m/s)</label>
-<input type="number" id="mas" name="mas" placeholder="3.5" step="0.1" max="15">
+<input type="number" id="mas" name="mas" placeholder="3.5" step="0.1" min="0.1" max="5">
 <label for="mxs">Maximum Speed (m/s)</label>
-<input type="number" id="mxs" name="mxs" placeholder="9.5" step="0.1" max="15">
+<input type="number" id="mxs" name="mxs" placeholder="9.5" step="0.1" min="0.1" max="11">
 <button type="submit">Calculate</button>
 		</form>
 	</div>
@@ -251,6 +261,34 @@
 
 <section id="RSA">
 <h3>Repeat Sprint Ability (RSA)</h3>
+<p>1. Enter data of your specific repeat sprint test</p>
+<div class="rsaform">
+	<form id="rsa-input"></form>
+	<label for="rep1">Rep 1</label>
+	<input type="number" name="rep1" id="rep1" placeholder="3.9" step="0.1" min="0.1" max="10">
+	<label for="rep2">Rep 2</label>
+	<input type="number" name="rep2" id="rep2" placeholder="3.9" step="0.1" min="0.1" max="10">
+	<label for="rep3">Rep 3</label>
+	<input type="number" name="rep3" id="rep3" placeholder="3.9" step="0.1" min="0.1" max="10">
+	<label for="rep4">Rep 4</label>
+	<input type="number" name="rep4" id="rep4" placeholder="3.9" step="0.1" min="0.1" max="10">
+	<label for="rep5">Rep 5</label>
+	<input type="number" name="rep5" id="rep5" placeholder="3.9" step="0.1" min="0.1" max="10">
+	<label for="rep6">Rep 6</label>
+	<input type="number" name="rep6" id="rep6" placeholder="3.9" step="0.1" min="0.1" max="10">
+	<label for="rep7">Rep 7</label>
+	<input type="number" name="rep7" id="rep7" placeholder="3.9" step="0.1" min="0.1" max="10">
+	<label for="rep8">Rep 8</label>
+	<input type="number" name="rep8" id="rep8" placeholder="3.9" step="0.1" min="0.1" max="10">
+	<label for="rep9">Rep 9</label>
+	<input type="number" name="rep9" id="rep9" placeholder="3.9" step="0.1" min="0.1" max="10">
+	<label for="rep10">Rep 10</label>
+	<input type="number" name="rep10" id="rep10" placeholder="3.9" step="0.1" min="0.1" max="10">
+</div>
+<hr>
+<h3>2. Results</h3>
+<hr>
+<h3>3. Plan Workouts</h3>
 </section>
 
 <hr>

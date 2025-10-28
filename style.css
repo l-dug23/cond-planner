@@ -107,7 +107,7 @@ padding: 5px;
 
 /* Nav styling */
 nav {
-  background: thistle;
+  background: rgb(76, 238, 168);
   padding: 0.5rem 1rem;
   border: 1px dashed black;
   border-radius: 10px;
@@ -133,7 +133,7 @@ nav ul {
 
 /* Nav container */
 nav {
-  background: rgba(63, 72, 234, 0.447);          
+  background: rgba(76, 238, 168, 0.418);          
   padding: 0.75rem 1.5rem;
   position: sticky;           /* stays at top when scrolling */
   top: 0;
@@ -217,3 +217,53 @@ figcaption {
   color: #555;
   margin-top: 0.5em;
 }
+
+img {
+  max-width: 100%;
+}
+
+
+/* animation wheel*/
+
+.wheel {
+  display: inline-block;
+  border: 10px solid black;
+  border-radius: 50%;
+  margin-left: 50px;
+  position: absolute;
+  height: 55vw;
+  width: 55vw;
+  max-width: 50px;
+  max-height: 50px;
+  animation-name: wheel;
+  animation-duration: 10s;
+  animation-iteration-count: infinite;
+  animation-timing-function: linear;
+}
+
+.line {
+  background-color: black;
+  width: 50%;
+  height: 2px;
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform-origin: 0% 0%;
+}
+
+.line:nth-of-type(2) {
+  transform: rotate(60deg);
+}
+.line:nth-of-type(3) {
+  transform: rotate(120deg);
+}
+.line:nth-of-type(4) {
+  transform: rotate(180deg);
+}
+.line:nth-of-type(5) {
+  transform: rotate(240deg);
+}
+.line:nth-of-type(6) {
+  transform: rotate(300deg);
+}
+
