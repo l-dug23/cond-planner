@@ -826,6 +826,76 @@ if (zwoBtn) {
 document.addEventListener("DOMContentLoaded", () => {
   if (!document.getElementById("running")) return;
 
+  // ---- UNIT + INPUT MODE TOGGLES ----
+let currentUnit = "metric";      // 'metric' or 'imperial'
+let inputMode = "pace";          // 'pace' or 'duration'
+
+// Map for distances in meters
+const distSets = {
+  metric: [
+    { id: "1k", label: "1 km", dist: 1000 },
+    { id: "3k", label: "3 km", dist: 3000 },
+    { id: "5k", label: "5 km", dist: 5000 },
+    { id: "10k", label: "10 km", dist: 10000 },
+  ],
+  imperial: [
+    { id: "1mi", label: "1 mi", dist: 1609.34 },
+    { id: "3mi", label: "3 mi", dist: 4828.02 },
+    { id: "5mi", label: "5 mi", dist: 8046.7 },
+    { id: "10mi", label: "10 mi", dist: 16093.4 },
+  ]
+};
+
+// Refresh form labels dynamically
+function updateDistanceLabels() {
+  const dists = distSets[currentUnit];
+  dists.forEach((d, i) => {
+    const input = document.querySelector(`#cs-form input[data-idx="${i}"]`);
+    if (input) input.placeholder = inputMode === "pace"
+      ? `Pace for ${d.label} (min:sec per ${currentUnit === 'metric' ? 'km' : 'mi'})`
+      : `Total time for ${d.label} (min:sec)`;
+    const label = document.querySelector(`#cs-form label[for="${input.id}"]`);
+    if (label) label.textContent = d.label;
+  });
+}
+
+// Build or rebuild the input fields
+function buildCSInputs() {
+  const container = document.getElementById("cs-inputs");
+  if (!container) return;
+  container.innerHTML = "";
+  distSets[currentUnit].forEach((d, i) => {
+    const row = document.createElement("div");
+    row.innerHTML = `
+      <label for="${d.id}">${d.label}</label>
+      <input type="text" id="${d.id}" data-idx="${i}" placeholder="${
+        inputMode === 'pace'
+          ? `Pace for ${d.label} (min:sec per ${currentUnit === 'metric' ? 'km' : 'mi'})`
+          : `Total time for ${d.label} (min:sec)`
+      }" />
+    `;
+    container.appendChild(row);
+  });
+}
+
+// Initialize selectors
+const unitSel = document.getElementById("unit-toggle");
+const inputSel = document.getElementById("input-toggle");
+
+if (unitSel && inputSel) {
+  unitSel.addEventListener("change", () => {
+    currentUnit = unitSel.value;
+    buildCSInputs();
+  });
+  inputSel.addEventListener("change", () => {
+    inputMode = inputSel.value;
+    updateDistanceLabels();
+  });
+}
+
+buildCSInputs();
+
+
   const $ = (sel) => document.querySelector(sel);
 
   // Globals
@@ -836,19 +906,22 @@ document.addEventListener("DOMContentLoaded", () => {
   if (csForm) {
     csForm.addEventListener("submit", (e) => {
       e.preventDefault();
-      const inputs = [
-        { id: "1km", dist: 1000 },
-        { id: "3km", dist: 3000 },
-        { id: "5km", dist: 5000 },
-        { id: "10km", dist: 10000 },
-      ];
+      const inputs = distSets[currentUnit];
+
 
       const dists = [], times = [];
       inputs.forEach((d) => {
         const t = App.parseTimeInput(document.getElementById(d.id).value);
         if (!isNaN(t)) {
           dists.push(d.dist);
-          times.push(t * (d.dist / 1000)); // seconds for that distance
+          if (inputMode === "pace") {
+  // pace = time per km/mi → convert to total time for distance
+  times.push(t * (d.dist / (currentUnit === "metric" ? 1000 : 1609.34)));
+} else {
+  // total duration input
+  times.push(t);
+}
+
         }
       });
 
@@ -1604,3 +1677,69 @@ if (asrResults) {
 
   });
 });
+
+// =============================
+// REPEAT SPRINT ABILITY (RSA)
+// =============================
+const rsaCalcBtn = document.getElementById("rsa-calc-btn");
+const rsaInputs = Array.from(document.querySelectorAll(".rsaform input"));
+const rsaCanvas = document.getElementById("rsa-graph");
+
+if (rsaCalcBtn && rsaInputs.length) {
+  rsaCalcBtn.addEventListener("click", () => {
+    const values = rsaInputs
+      .map(inp => parseFloat(inp.value))
+      .filter(v => !isNaN(v) && v > 0);
+
+    if (values.length < 2) {
+      alert("Please enter at least two valid sprint times.");
+      return;
+    }
+
+    // Core RSA metrics
+    const bst = Math.min(...values);
+    const ast = values.reduce((a, b) => a + b, 0) / values.length;
+    const tst = values.reduce((a, b) => a + b, 0);
+    const dec = ((tst / (bst * values.length)) - 1) * 100; // % decrement
+
+    // Display results
+    document.getElementById("rsa-bst").textContent = bst.toFixed(2);
+    document.getElementById("rsa-ast").textContent = ast.toFixed(2);
+    document.getElementById("rsa-tst").textContent = tst.toFixed(2);
+    document.getElementById("rsa-dec").textContent = dec.toFixed(2);
+
+    // --- Bar Chart (Rep Times) ---
+    if (window.rsaChart) window.rsaChart.destroy();
+    const ctx = rsaCanvas.getContext("2d");
+    window.rsaChart = new Chart(ctx, {
+      type: "bar",
+      data: {
+        labels: values.map((_, i) => `Rep ${i + 1}`),
+        datasets: [{
+          label: "Sprint Time (s)",
+          data: values,
+          backgroundColor: "#4caf50aa",
+          borderColor: "#2e7d32",
+          borderWidth: 1
+        }]
+      },
+      options: {
+        plugins: {
+          title: {
+            display: true,
+            text: "Repeat Sprint Times"
+          }
+        },
+        scales: {
+          y: {
+            beginAtZero: true,
+            title: { display: true, text: "Time (s)" }
+          },
+          x: {
+            title: { display: true, text: "Repetition" }
+          }
+        }
+      }
+    });
+  });
+}

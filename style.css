@@ -276,3 +276,43 @@ img {
    }
 }
 
+#cs-inputs {
+  display: flex;
+  flex-wrap: wrap;              /* allows wrapping to next line if needed */
+  gap: 12px 20px;               /* row-gap | column-gap for spacing */
+  align-items: center;
+  justify-content: center;
+}
+
+#cs-inputs div {
+  display: flex;
+  flex-direction: column;       /* label above input */
+  min-width: 120px;             /* keeps boxes readable */
+}
+
+/* Container for the whole RSA form */
+.rsaform {
+  display: flex;
+  flex-wrap: wrap;               /* allows wrapping to next line if needed */
+  justify-content: center;       /* centers across the page */
+  gap: 12px 20px;                /* vertical/horizontal gap */
+}
+
+/* Each label + input pair */
+.rsaform label {
+  display: block;
+  text-align: center;
+  font-weight: 600;
+  margin-bottom: 4px;
+}
+
+.rsaform input {
+  display: block;
+  margin: 0 auto;
+  width: 40px;                   /* you can tweak width */
+  padding: 5px;
+  text-align: center;
+  border: 1px solid #ccc;
+  border-radius: 6px;
+  font-size: 14px;
+}
