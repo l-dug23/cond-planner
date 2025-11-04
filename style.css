@@ -317,32 +317,114 @@ img {
   font-size: 10px;
 }
 
+/* --- Chatbox container --- */
 #chatbox {
-  position: fixed;       /* Makes it stay in place */
-  bottom: 90px;          /* Distance from the bottom of the screen */
-  right: 30px;           /* Distance from the right side */
-  width: 300px;
-  background: white;
-  border-radius: 10px;
-  padding: 15px;
-  box-shadow: 0 4px 15px rgba(0, 0, 0, 0.2);
-  z-index: 1000;         /* Keeps it above other content */
+  position: fixed;
+  bottom: 90px;
+  right: 30px;
+  width: 320px;
+  height: 480px;
+  background: #fefefe;
+  border-radius: 25px;
+  display: none;
+  flex-direction: column;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.25);
+  overflow: hidden;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  z-index: 1000;
 }
 
+/* --- Floating toggle button --- */
 #chatButton {
   position: fixed;
-  bottom: 20px;      /* below the box */
+  bottom: 20px;
   right: 30px;
-  background: #0078ff;
+  background: linear-gradient(135deg, #007aff, #71858f);
   color: white;
   border-radius: 50px;
-  padding: 12px 18px;
+  padding: 12px 20px;
+  font-weight: 600;
+  cursor: pointer;
+  box-shadow: 0 4px 15px rgba(0, 0, 0, 0.3);
+  z-index: 999;
+  transition: all 0.3s ease;
+}
+#chatButton:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.35);
+}
+
+/* --- Messages area --- */
+#messages {
+  flex: 1;
+  padding: 15px;
+  background: #f5f5f7;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  text-align: justify;
+}
+
+/* --- Input area --- */
+.input-area {
   display: flex;
   align-items: center;
-  gap: 8px;
-  font-weight: bold;
-  font-family: Arial, sans-serif;
-  cursor: pointer;
-  box-shadow: 0 4px 10px rgba(0,0,0,0.3);
-  z-index: 999;
+  background: #ffffff;
+  padding: 10px;
+  border-top: 1px solid #ddd;
 }
+
+#userInput {
+  flex: 1;
+  border: none;
+  border-radius: 20px;
+  padding: 10px 15px;
+  background: #f0f0f5;
+  font-size: 14px;
+  outline: none;
+}
+
+#sendBtn {
+  margin-left: 8px;
+  background: #007aff;
+  color: #fff;
+  border: none;
+  border-radius: 20px;
+  padding: 10px 16px;
+  font-weight: bold;
+  cursor: pointer;
+  transition: background 0.3s;
+}
+#sendBtn:hover {
+  background: #005fcc;
+}
+
+/* --- Message bubbles --- */
+.user {
+  align-self: flex-end;
+  background: #007aff;
+  color: #fff;
+  padding: 10px 14px;
+  border-radius: 20px;
+  border-bottom-right-radius: 4px;
+  max-width: 70%;
+  word-wrap: break-word;
+  font-size: 14px;
+  box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+}
+
+.bot {
+  align-self: flex-start;
+  background: #e5e5ea;
+  color: #000;
+  padding: 10px 14px;
+  border-radius: 20px;
+  border-bottom-left-radius: 4px;
+  max-width: 70%;
+  word-wrap: break-word;
+  font-size: 14px;
+  box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+}
+
+

@@ -1747,9 +1747,10 @@ if (rsaCalcBtn && rsaInputs.length) {
 //====================================
 // chat bot
 //====================================
+// Toggle chat open/close
 document.getElementById('chatButton').addEventListener('click', () => {
   const box = document.getElementById('chatbox');
-  box.style.display = box.style.display === 'none' ? 'block' : 'none';
+  box.style.display = box.style.display === 'none' ? 'flex' : 'none';
 });
 
 let responses = {};
@@ -1765,36 +1766,39 @@ const input = document.getElementById('userInput');
 const sendBtn = document.getElementById('sendBtn');
 
 sendBtn.addEventListener('click', sendMessage);
-input.addEventListener('keypress', function(e) {
+input.addEventListener('keypress', e => {
   if (e.key === 'Enter') sendMessage();
 });
 
 function sendMessage() {
-  const text = input.value.trim().toLowerCase();
+  const text = input.value.trim();
   if (!text) return;
 
-  addMessage(`You: ${input.value}`, 'user');
+  // Add user bubble
+  addMessage(text, 'user');
 
-  // Find a matching response (by keyword)
-  const reply = getResponse(text);
-  setTimeout(() => addMessage(`Boz: ${reply}`, 'boz'), 500);
+  // Get reply
+  const reply = getResponse(text.toLowerCase());
+
+  // Simulate typing delay
+  setTimeout(() => addMessage(reply, 'bot'), 600);
 
   input.value = '';
 }
 
 function getResponse(inputText) {
   for (let key in responses) {
-    if (inputText.includes(key)) {
+    if (inputText.includes(key.toLowerCase())) {
       return responses[key];
     }
   }
-  return responses['default'];
+  return "Sorry, I didn’t quite get that 🤖";
 }
 
 function addMessage(msg, cls) {
-  const p = document.createElement('p');
-  p.textContent = msg;
-  p.className = cls;
-  messages.appendChild(p);
+  const div = document.createElement('div');
+  div.className = cls;
+  div.textContent = msg;
+  messages.appendChild(div);
   messages.scrollTop = messages.scrollHeight;
 }

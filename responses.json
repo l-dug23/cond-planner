@@ -1,6 +1,7 @@
 {
     "hello": "Hi there! I am an AI version of Boz 👋  How can I help today?",
     "hi": "Hiya, what knowledge 💣 can i give you today?",
+    "how are you?": "I am fantastico",
     "bye": "See you later aligator",
     "cheers": "You're welcome🍻",
     "thanks": "I'll send you a 💳 / 💵 request now!",
@@ -16,5 +17,8 @@
     "equation 2 parameter": "The main Critical Power equation is P = (W′ / t) + CP, where P is power, t is time to exhaustion, W′ is your finite work capacity above CP, and CP is your sustainable power limit.",
     "equation 3 parameter": "The 3-parameter Critical Power model adds a curvature term to improve accuracy for short efforts. One version is P = (W′ / (t + k)) + CP, where k is a constant that adjusts how quickly power drops at short durations.",
     "what shall i use?": "I would go with the 3 parameter model as it is more stable with higher intensity efforts and gived better predictions of your W'.",
-    "what percentages for the training zones?": "Z1 Recovery 0-55%, Z2 Endurance 56-75%, Z3 Tempo 75-90%, Z4 Threshold 91-105%, Z5 VO2max 106-120%, Z6 anaerobic 121-150%, Z7 Neuromuscular >151%"
+    "what percentages for the training zones?": "Z1 Recovery 0-55%, Z2 Endurance 56-75%, Z3 Tempo 75-90%, Z4 Threshold 91-105%, Z5 VO2max 106-120%, Z6 anaerobic 121-150%, Z7 Neuromuscular >151%",
+    "zones": "Z1 Recovery 0-55%, Z2 Endurance 56-75%, Z3 Tempo 75-90%, Z4 Threshold 91-105%, Z5 VO2max 106-120%, Z6 anaerobic 121-150%, Z7 Neuromuscular >151%",
+    "what is ftp?": "FTP stands for functional threshold power - essentially the power you can sustain for 1 hour",
+    "ftp": "FTP stands for functional threshold power - essentially the power you can sustain for 1 hour"
 }
