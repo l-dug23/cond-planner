@@ -2,8 +2,9 @@
     "hello": "Hi there! I am an AI version of Boz 👋  How can I help today?",
     "hi": "Hiya, what knowledge 💣 can i give you today?",
     "bye": "See you later aligator",
-    "cheers": "You're welcome!",
+    "cheers": "You're welcome🍻",
     "thanks": "I'll send you a 💳 / 💵 request now!",
+    "whats the weather like?": "I have absolutely no idea - stop with this nonsense quesitoning!",
     "explain critical power": "Critical power (CP) is the highest power you can keep going for a long time without getting tired too quickly. If you go above it, you’ll fatigue fast. It shows the line between what’s sustainable and what’s too hard to hold.",
     "cp": "Critical power (CP) is the highest power you can keep going for a long time without getting tired too quickly. If you go above it, you’ll fatigue fast. It shows the line between what’s sustainable and what’s too hard to hold.",
     "2 parameter model": "The 2-parameter Critical Power model uses just CP and W′. CP is your steady-state limit, and W′ is your anaerobic work above CP. It fits a straight-line relationship between power and 1/time.",
@@ -14,6 +15,6 @@
     "equation critical power": "The main Critical Power equation is P = (W′ / t) + CP, where P is power, t is time to exhaustion, W′ is your finite work capacity above CP, and CP is your sustainable power limit.",
     "equation 2 parameter": "The main Critical Power equation is P = (W′ / t) + CP, where P is power, t is time to exhaustion, W′ is your finite work capacity above CP, and CP is your sustainable power limit.",
     "equation 3 parameter": "The 3-parameter Critical Power model adds a curvature term to improve accuracy for short efforts. One version is P = (W′ / (t + k)) + CP, where k is a constant that adjusts how quickly power drops at short durations.",
-    "what shall i use?": "I would go with the 3 parameter model as it is more stable with higher intensity efforts and gived better predictions of your W'."
-
+    "what shall i use?": "I would go with the 3 parameter model as it is more stable with higher intensity efforts and gived better predictions of your W'.",
+    "what percentages for the training zones?": "Z1 Recovery 0-55%, Z2 Endurance 56-75%, Z3 Tempo 75-90%, Z4 Threshold 91-105%, Z5 VO2max 106-120%, Z6 anaerobic 121-150%, Z7 Neuromuscular >151%"
 }
