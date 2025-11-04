@@ -1712,7 +1712,7 @@ if (rsaCalcBtn && rsaInputs.length) {
     if (window.rsaChart) window.rsaChart.destroy();
     const ctx = rsaCanvas.getContext("2d");
     window.rsaChart = new Chart(ctx, {
-      type: "bar",
+      type: "line",
       data: {
         labels: values.map((_, i) => `Rep ${i + 1}`),
         datasets: [{
@@ -1742,4 +1742,59 @@ if (rsaCalcBtn && rsaInputs.length) {
       }
     });
   });
+}
+
+//====================================
+// chat bot
+//====================================
+document.getElementById('chatButton').addEventListener('click', () => {
+  const box = document.getElementById('chatbox');
+  box.style.display = box.style.display === 'none' ? 'block' : 'none';
+});
+
+let responses = {};
+
+// Load the JSON data
+fetch('responses.json')
+  .then(res => res.json())
+  .then(data => responses = data)
+  .catch(err => console.error('Error loading responses:', err));
+
+const messages = document.getElementById('messages');
+const input = document.getElementById('userInput');
+const sendBtn = document.getElementById('sendBtn');
+
+sendBtn.addEventListener('click', sendMessage);
+input.addEventListener('keypress', function(e) {
+  if (e.key === 'Enter') sendMessage();
+});
+
+function sendMessage() {
+  const text = input.value.trim().toLowerCase();
+  if (!text) return;
+
+  addMessage(`You: ${input.value}`, 'user');
+
+  // Find a matching response (by keyword)
+  const reply = getResponse(text);
+  setTimeout(() => addMessage(`Boz: ${reply}`, 'boz'), 500);
+
+  input.value = '';
+}
+
+function getResponse(inputText) {
+  for (let key in responses) {
+    if (inputText.includes(key)) {
+      return responses[key];
+    }
+  }
+  return responses['default'];
+}
+
+function addMessage(msg, cls) {
+  const p = document.createElement('p');
+  p.textContent = msg;
+  p.className = cls;
+  messages.appendChild(p);
+  messages.scrollTop = messages.scrollHeight;
 }

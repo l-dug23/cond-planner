@@ -1,0 +1,19 @@
+{
+    "hello": "Hi there! I am an AI version of Boz 👋  How can I help today?",
+    "hi": "Hiya, what knowledge 💣 can i give you today?",
+    "bye": "See you later aligator",
+    "cheers": "You're welcome!",
+    "thanks": "I'll send you a 💳 / 💵 request now!",
+    "explain critical power": "Critical power (CP) is the highest power you can keep going for a long time without getting tired too quickly. If you go above it, you’ll fatigue fast. It shows the line between what’s sustainable and what’s too hard to hold.",
+    "cp": "Critical power (CP) is the highest power you can keep going for a long time without getting tired too quickly. If you go above it, you’ll fatigue fast. It shows the line between what’s sustainable and what’s too hard to hold.",
+    "2 parameter model": "The 2-parameter Critical Power model uses just CP and W′. CP is your steady-state limit, and W′ is your anaerobic work above CP. It fits a straight-line relationship between power and 1/time.",
+    "3 parameter model": "The 3-parameter Critical Power model adds a third term that slightly curves the line. This helps fit very short-duration sprints better, giving a more accurate CP and W′ for all-out tests.",
+    "difference between 2 and 3 parameter": "The 2-parameter model is simple and assumes a straight line between power and 1/time. The 3-parameter model adds a curvature term to improve accuracy for short efforts. Both estimate CP and W′, but the 3-parameter version handles high-intensity data better.",
+    "w prime": "Is the amount of extra work you can do above your Critical Power before you have to stop. Think of it like your anaerobic battery — once it's used up, you fatigue and need recovery time to recharge it.",
+    "w'": "Is the amount of extra work you can do above your Critical Power before you have to stop. Think of it like your anaerobic battery — once it's used up, you fatigue and need recovery time to recharge it.",
+    "equation critical power": "The main Critical Power equation is P = (W′ / t) + CP, where P is power, t is time to exhaustion, W′ is your finite work capacity above CP, and CP is your sustainable power limit.",
+    "equation 2 parameter": "The main Critical Power equation is P = (W′ / t) + CP, where P is power, t is time to exhaustion, W′ is your finite work capacity above CP, and CP is your sustainable power limit.",
+    "equation 3 parameter": "The 3-parameter Critical Power model adds a curvature term to improve accuracy for short efforts. One version is P = (W′ / (t + k)) + CP, where k is a constant that adjusts how quickly power drops at short durations.",
+    "what shall i use?": "I would go with the 3 parameter model as it is more stable with higher intensity efforts and gived better predictions of your W'."
+
+}
