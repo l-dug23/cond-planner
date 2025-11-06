@@ -373,18 +373,22 @@ nav ul li.dropdown:hover .dropdown-content { display: block; }
   padding: 10px;
 }
 
-.session-item {
-  border: 1px solid #90caf9;
-  border-radius: 6px;
-  padding: 6px 10px;
-  margin: 5px 0;
-  cursor: grab;
-  transition: background 0.2s ease;
+#sessions-list {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
+  gap: 8px;
 }
 
-.session-item:active {
-  cursor: grabbing;
-  background: #bbdefb;
+/* ✅ NEW — ensure thumbnail images display nicely */
+.session-item img {
+  width: 100%;
+  border-radius: 4px;
+  margin-bottom: 3px;
+}
+
+/* ✅ NEW — optional small hover pop for UI feel */
+.session-item:hover {
+  transform: scale(1.02);
 }
 
 /* ===== Calendar Grid ===== */
@@ -407,8 +411,21 @@ nav ul li.dropdown:hover .dropdown-content { display: block; }
   justify-content: flex-start;
 }
 
+/* ✅ NEW — thumbnails inside calendar days */
+.calendar-day .session-item img {
+  width: 100%;
+  border-radius: 4px;
+  margin-bottom: 2px;
+}
+
+/* ✅ NEW — slight hover visual feedback on days */
+.calendar-day:hover {
+  background: #efefef;
+}
+
 .calendar-day .date {
   font-weight: bold;
   margin-bottom: 5px;
   color: #656565;
 }
+

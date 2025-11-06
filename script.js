@@ -545,6 +545,20 @@ sections.forEach((s, i) => {
   },
 });
 
+// --- ADD THUMBNAIL CODE ---
+const sessionName = document.getElementById("session-name")?.value?.trim();
+if (sessionName) {
+  try {
+    // Create small PNG thumbnail
+    const thumbData = canvas.toDataURL("image/png", 0.5);
+    const prefix = "cycle_session_";
+    localStorage.setItem(prefix + sessionName + "_thumb", thumbData);
+    console.log("Saved thumbnail for:", sessionName);
+  } catch (err) {
+    console.warn("Thumbnail save failed:", err);
+  }
+}
+// --- END THUMBNAIL CODE ---
 
       // Metrics
       updateCycleMetrics(powerSeries, CP);
@@ -1289,11 +1303,25 @@ options: {
       max: DPRIME || undefined,
       beginAtZero: true,
       grid: { drawOnChartArea: false }
-    }
+    },
+  },
+},
+      });
+      
+//  --- ADD THUMBNAIL CODE ---
+const sessionName = document.getElementById("run-session-name")?.value?.trim();
+if (sessionName) {
+  try {
+    const thumbData = runCanvas.toDataURL("image/png", 0.5);
+    const prefix = "run_session_";
+    localStorage.setItem(prefix + sessionName + "_thumb", thumbData);
+    console.log("Saved run thumbnail for:", sessionName);
+  } catch (err) {
+    console.warn("Thumbnail save failed:", err);
   }
 }
+//  --- END THUMBNAIL CODE ---
 
-      });
 
       // Metrics
       updateRunMetrics(speedSeries, CS);
@@ -1806,46 +1834,47 @@ function addMessage(msg, cls) {
 // ============================================
 // CALENDAR MODULE
 // ============================================
-document.addEventListener("DOMContentLoaded", () => {
-  const grid = document.getElementById("calendar-grid");
-  const rangeSelect = document.getElementById("weekRange");
+// document.addEventListener("DOMContentLoaded", () => {
+//   const grid = document.getElementById("calendar-grid");
+//   const rangeSelect = document.getElementById("weekRange");
 
-  if (!grid || !rangeSelect) return; // safely exit if calendar isn't on the page
+//   if (!grid || !rangeSelect) return; // safely exit if calendar isn't on the page
 
-  function getMonday(date) {
-    const d = new Date(date);
-    const day = d.getDay();
-    const diff = d.getDate() - day + (day === 0 ? -6 : 1);
-    return new Date(d.setDate(diff));
-  }
+//   function getMonday(date) {
+//     const d = new Date(date);
+//     const day = d.getDay();
+//     const diff = d.getDate() - day + (day === 0 ? -6 : 1);
+//     return new Date(d.setDate(diff));
+//   }
 
-  function renderCalendar(weeks = 4) {
-    grid.innerHTML = "";
-    const start = getMonday(new Date());
-    const daysToShow = weeks * 7;
+//   function renderCalendar(weeks = 4) {
+//     grid.innerHTML = "";
+//     const start = getMonday(new Date());
+//     const daysToShow = weeks * 7;
 
-    for (let i = 0; i < daysToShow; i++) {
-      const day = new Date(start);
-      day.setDate(start.getDate() + i);
-      const dayDiv = document.createElement("div");
-      dayDiv.className = "calendar-day";
+//     for (let i = 0; i < daysToShow; i++) {
+//       const day = new Date(start);
+//       day.setDate(start.getDate() + i);
+//       const dayDiv = document.createElement("div");
+//       dayDiv.className = "calendar-day";
 
-      const dayName = day.toLocaleDateString("en-GB", { weekday: "short" });
-      const dateNum = day.getDate();
+//       const dayName = day.toLocaleDateString("en-GB", { weekday: "short" });
+//       const dateNum = day.getDate();
 
-      dayDiv.innerHTML = `<div class="date">${dayName} ${dateNum}</div>`;
-      grid.appendChild(dayDiv);
-    }
-  }
+//       dayDiv.innerHTML = `<div class="date">${dayName} ${dateNum}</div>`;
+//       grid.appendChild(dayDiv);
+//     }
+//   }
 
-  // Initialize and handle changes
-  renderCalendar(parseInt(rangeSelect.value));
-  rangeSelect.addEventListener("change", e => renderCalendar(parseInt(e.target.value)));
-});
+//   // Initialize and handle changes
+//   renderCalendar(parseInt(rangeSelect.value));
+//   rangeSelect.addEventListener("change", e => renderCalendar(parseInt(e.target.value)));
+// });
 
 // ============================================
 // PROGRAMMING MODULE (Calendar + Drag Sessions)
 // ============================================
+
 document.addEventListener("DOMContentLoaded", () => {
   const grid = document.getElementById("calendar-grid");
   const weekRange = document.getElementById("weekRange");
@@ -1854,6 +1883,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
   if (!grid || !weekRange || !sportSelect) return;
 
+  // --- Helper: get Monday of current week ---
   function getMonday(date) {
     const d = new Date(date);
     const day = d.getDay();
@@ -1861,6 +1891,7 @@ document.addEventListener("DOMContentLoaded", () => {
     return new Date(d.setDate(diff));
   }
 
+  // --- Render calendar grid ---
   function renderCalendar(weeks = 1) {
     grid.innerHTML = "";
     const start = getMonday(new Date());
@@ -1878,13 +1909,23 @@ document.addEventListener("DOMContentLoaded", () => {
         day: "numeric",
       })}</div>`;
 
+      // ✅ Allow drag + drop
       div.addEventListener("dragover", e => e.preventDefault());
       div.addEventListener("drop", e => {
         e.preventDefault();
         const sessionName = e.dataTransfer.getData("text/plain");
+        const sport = sportSelect.value;
+        const prefix = sport === "cycling" ? "cycle_session_" : "run_session_";
+        const thumb = localStorage.getItem(prefix + sessionName + "_thumb");
+
         const item = document.createElement("div");
         item.className = "session-item";
-        item.textContent = sessionName;
+        item.style.fontSize = "0.75rem";
+        item.style.padding = "3px";
+        item.innerHTML = thumb
+          ? `<img src="${thumb}" alt="${sessionName}" style="width:100%;border-radius:4px;margin-bottom:2px;"><div>${sessionName}</div>`
+          : sessionName;
+
         div.appendChild(item);
       });
 
@@ -1892,12 +1933,14 @@ document.addEventListener("DOMContentLoaded", () => {
     }
   }
 
+  // --- Load saved sessions from localStorage ---
   function loadSessions() {
     sessionList.innerHTML = "";
     const sport = sportSelect.value;
     const prefix = sport === "cycling" ? "cycle_session_" : "run_session_";
 
-    const keys = Object.keys(localStorage).filter(k => k.startsWith(prefix));
+    const keys = Object.keys(localStorage)
+      .filter(k => k.startsWith(prefix) && !k.endsWith("_thumb"));
 
     if (keys.length === 0) {
       sessionList.innerHTML = "<p style='color:#666;'>No saved sessions found.</p>";
@@ -1906,11 +1949,18 @@ document.addEventListener("DOMContentLoaded", () => {
 
     keys.forEach(key => {
       const name = key.replace(prefix, "");
+      const thumb = localStorage.getItem(prefix + name + "_thumb");
+
       const div = document.createElement("div");
       div.className = "session-item";
-      div.textContent = name;
       div.draggable = true;
 
+      // ✅ Add thumbnail if available
+      div.innerHTML = thumb
+        ? `<img src="${thumb}" alt="${name}" style="width:100%;border-radius:4px;margin-bottom:4px;"><div>${name}</div>`
+        : name;
+
+      // ✅ Enable drag
       div.addEventListener("dragstart", e => {
         e.dataTransfer.setData("text/plain", name);
       });
@@ -1919,6 +1969,7 @@ document.addEventListener("DOMContentLoaded", () => {
     });
   }
 
+  // --- Initialize + Event listeners ---
   renderCalendar(parseInt(weekRange.value));
   loadSessions();
 
