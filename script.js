@@ -1802,3 +1802,126 @@ function addMessage(msg, cls) {
   messages.appendChild(div);
   messages.scrollTop = messages.scrollHeight;
 }
+
+// ============================================
+// CALENDAR MODULE
+// ============================================
+document.addEventListener("DOMContentLoaded", () => {
+  const grid = document.getElementById("calendar-grid");
+  const rangeSelect = document.getElementById("weekRange");
+
+  if (!grid || !rangeSelect) return; // safely exit if calendar isn't on the page
+
+  function getMonday(date) {
+    const d = new Date(date);
+    const day = d.getDay();
+    const diff = d.getDate() - day + (day === 0 ? -6 : 1);
+    return new Date(d.setDate(diff));
+  }
+
+  function renderCalendar(weeks = 4) {
+    grid.innerHTML = "";
+    const start = getMonday(new Date());
+    const daysToShow = weeks * 7;
+
+    for (let i = 0; i < daysToShow; i++) {
+      const day = new Date(start);
+      day.setDate(start.getDate() + i);
+      const dayDiv = document.createElement("div");
+      dayDiv.className = "calendar-day";
+
+      const dayName = day.toLocaleDateString("en-GB", { weekday: "short" });
+      const dateNum = day.getDate();
+
+      dayDiv.innerHTML = `<div class="date">${dayName} ${dateNum}</div>`;
+      grid.appendChild(dayDiv);
+    }
+  }
+
+  // Initialize and handle changes
+  renderCalendar(parseInt(rangeSelect.value));
+  rangeSelect.addEventListener("change", e => renderCalendar(parseInt(e.target.value)));
+});
+
+// ============================================
+// PROGRAMMING MODULE (Calendar + Drag Sessions)
+// ============================================
+document.addEventListener("DOMContentLoaded", () => {
+  const grid = document.getElementById("calendar-grid");
+  const weekRange = document.getElementById("weekRange");
+  const sportSelect = document.getElementById("sport");
+  const sessionList = document.getElementById("sessions-list");
+
+  if (!grid || !weekRange || !sportSelect) return;
+
+  function getMonday(date) {
+    const d = new Date(date);
+    const day = d.getDay();
+    const diff = d.getDate() - day + (day === 0 ? -6 : 1);
+    return new Date(d.setDate(diff));
+  }
+
+  function renderCalendar(weeks = 1) {
+    grid.innerHTML = "";
+    const start = getMonday(new Date());
+    const daysToShow = weeks * 7;
+
+    for (let i = 0; i < daysToShow; i++) {
+      const day = new Date(start);
+      day.setDate(start.getDate() + i);
+
+      const div = document.createElement("div");
+      div.className = "calendar-day";
+      div.dataset.date = day.toISOString().split("T")[0];
+      div.innerHTML = `<div class="date">${day.toLocaleDateString("en-GB", {
+        weekday: "short",
+        day: "numeric",
+      })}</div>`;
+
+      div.addEventListener("dragover", e => e.preventDefault());
+      div.addEventListener("drop", e => {
+        e.preventDefault();
+        const sessionName = e.dataTransfer.getData("text/plain");
+        const item = document.createElement("div");
+        item.className = "session-item";
+        item.textContent = sessionName;
+        div.appendChild(item);
+      });
+
+      grid.appendChild(div);
+    }
+  }
+
+  function loadSessions() {
+    sessionList.innerHTML = "";
+    const sport = sportSelect.value;
+    const prefix = sport === "cycling" ? "cycle_session_" : "run_session_";
+
+    const keys = Object.keys(localStorage).filter(k => k.startsWith(prefix));
+
+    if (keys.length === 0) {
+      sessionList.innerHTML = "<p style='color:#666;'>No saved sessions found.</p>";
+      return;
+    }
+
+    keys.forEach(key => {
+      const name = key.replace(prefix, "");
+      const div = document.createElement("div");
+      div.className = "session-item";
+      div.textContent = name;
+      div.draggable = true;
+
+      div.addEventListener("dragstart", e => {
+        e.dataTransfer.setData("text/plain", name);
+      });
+
+      sessionList.appendChild(div);
+    });
+  }
+
+  renderCalendar(parseInt(weekRange.value));
+  loadSessions();
+
+  weekRange.addEventListener("change", e => renderCalendar(parseInt(e.target.value)));
+  sportSelect.addEventListener("change", loadSessions);
+});

@@ -328,6 +328,27 @@
 <section id="programming">
 	<h3>📆 Weekly Programming 📆</h3>
 	<p>Select sport (cycling / running) and drag and drop saved sessions into the week</p>
+	<div id="calendar-controls">
+		<label>Select Sport:</label>
+		<select id="sport">
+			<option value="cycling" selected>Cycling</option>
+			<option value="running">Running</option>
+		</select>
+    <label>View:</label>
+    <select id="weekRange">
+      <option value="1" selected>1 Week</option>
+      <option value="2">2 Weeks</option>
+      <option value="4">4 Weeks</option>
+      <option value="6">6 Weeks</option>
+    </select>
+  </div>
+
+  <div id="session-pool">
+    <h4>Saved Sessions</h4>
+    <div id="sessions-list"></div>
+  </div>
+  
+  <div id="calendar-grid"></div>
 </section>
 
 </main>
