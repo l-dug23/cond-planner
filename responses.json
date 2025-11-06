@@ -20,5 +20,6 @@
     "what percentages for the training zones?": "Z1 Recovery 0-55%, Z2 Endurance 56-75%, Z3 Tempo 75-90%, Z4 Threshold 91-105%, Z5 VO2max 106-120%, Z6 anaerobic 121-150%, Z7 Neuromuscular >151%",
     "zones": "Z1 Recovery 0-55%, Z2 Endurance 56-75%, Z3 Tempo 75-90%, Z4 Threshold 91-105%, Z5 VO2max 106-120%, Z6 anaerobic 121-150%, Z7 Neuromuscular >151%",
     "what is ftp?": "FTP stands for functional threshold power - essentially the power you can sustain for 1 hour",
-    "ftp": "FTP stands for functional threshold power - essentially the power you can sustain for 1 hour"
+    "ftp": "FTP stands for functional threshold power - essentially the power you can sustain for 1 hour",
+    "write sessions": "📝 To write a session:\n\n🚴 *Cycling*\n- Use lines like '10min @ 70%' or '3min @ 300w'.\n- Repeat blocks with '3x(2min @ 120%, 1min @ 60%)'.\n- Add sections using 'Warm Up >>', 'Main Set >>', 'Cool Down >>'.\n\n🏃 *Running*\n- Use '5min @ 95%CS' or '1k @ 100%CS'.\n- Repeats: '4x(400m @ 105%CS, 1min @ 70%CS)'.\n- Add sections the same way with 'Warm Up >>'.\n\n💡 Tips: one instruction per line, '%' = of CP/FTP (cycling) or CS (running), blank lines ignored."
 }
