@@ -51,11 +51,13 @@ th, td {
   border: 1px solid #444;
   padding: 5px 10px;
   text-align: center;
+  color: #000;
 }
 .zone-tables {
   display: flex;
   gap: 40px;
   flex-wrap: wrap;
+  color: #000;
 }
 
 /* === Forms and Inputs === */
@@ -411,6 +413,40 @@ nav ul li.dropdown:hover .dropdown-content { display: block; }
   justify-content: flex-start;
 }
 
+/* Calendar day styling */
+.calendar-day {
+  background: #ffffff;
+  color: #000000; /* 🔹 Makes all text inside day black */
+  border: 1px solid #ddd;
+  border-radius: 8px;
+  padding: 10px;
+  min-height: 100px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: flex-start;
+}
+
+/* Session item text inside the calendar */
+.calendar-day .session-item {
+  color: #000000; /* 🔹 Ensures dropped session text is black */
+  background: #ffffff;
+  border: 1px solid #888;
+  border-radius: 6px;
+  padding: 3px 6px;
+  font-size: 0.85rem;
+  margin-top: 4px;
+  text-align: center;
+  box-shadow: 0 1px 2px rgba(0,0,0,0.1);
+}
+
+.calendar-day .session-item img {
+  max-height: 60px;
+  object-fit: contain;
+  border-radius: 4px;
+  margin-bottom: 3px;
+}
+
 /* ✅ NEW — thumbnails inside calendar days */
 .calendar-day .session-item img {
   width: 100%;
@@ -429,3 +465,95 @@ nav ul li.dropdown:hover .dropdown-content { display: block; }
   color: #656565;
 }
 
+/* === Floating 3-Dot Menu Button (Left Side) === */
+.nav-button {
+  position: fixed;
+  top: 20px;
+  left: 25px;
+  width: 45px;
+  height: 45px;
+  background: linear-gradient(135deg, #3b82f6, #1d4ed8);
+  border-radius: 50%;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  cursor: pointer;
+  z-index: 1001;
+  box-shadow: 0 4px 10px rgba(0,0,0,0.3);
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+
+.nav-button:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 6px 14px rgba(0,0,0,0.4);
+}
+
+/* Three small dots inside the circle */
+.nav-button .dot {
+  width: 6px;
+  height: 6px;
+  background-color: #fff;
+  border-radius: 50%;
+  margin: 2px 0; /* closer spacing between dots */
+  transition: transform 0.3s ease;
+}
+
+.nav-button:hover .dot {
+  transform: scale(1.2);
+}
+
+/* === Slide-out Side Menu === */
+.side-menu {
+  position: fixed;
+  top: 0;
+  left: -220px; /* hidden by default */
+  width: 200px;
+  height: 100%;
+  background: #1e293b;
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-start;
+  padding-top: 70px;
+  box-shadow: 3px 0 8px rgba(0,0,0,0.3);
+  transition: left 0.3s ease;
+  z-index: 1000;
+}
+
+.side-menu a {
+  color: #e2e8f0;
+  text-decoration: none;
+  padding: 12px 20px;
+  font-size: 18px;
+  text-align: left;
+  border-bottom: 1px solid #334155;
+}
+
+.side-menu a:hover {
+  background: #334155;
+  color: #dde027;
+}
+
+/* When menu is open */
+.side-menu.active {
+  left: 0;
+}
+
+/* === Page overlay when side menu is active === */
+#overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background: rgba(0, 0, 0, 0.55);
+  opacity: 0;
+  visibility: hidden;
+  transition: opacity 0.3s ease, visibility 0.3s ease;
+  z-index: 900; /* below side menu (1000) but above page */
+}
+
+#overlay.active {
+  opacity: 1;
+  visibility: visible;
+}

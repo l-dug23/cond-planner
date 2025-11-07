@@ -1976,3 +1976,23 @@ document.addEventListener("DOMContentLoaded", () => {
   weekRange.addEventListener("change", e => renderCalendar(parseInt(e.target.value)));
   sportSelect.addEventListener("change", loadSessions);
 });
+
+// === Left-side 3-dot nav toggle with overlay ===
+document.addEventListener("DOMContentLoaded", () => {
+  const navButton = document.getElementById("navButton");
+  const sideMenu = document.getElementById("sideMenu");
+  const overlay = document.getElementById("overlay");
+
+  if (navButton && sideMenu && overlay) {
+    navButton.addEventListener("click", () => {
+      sideMenu.classList.toggle("active");
+      overlay.classList.toggle("active");
+    });
+
+    overlay.addEventListener("click", () => {
+      // Clicking outside closes the menu
+      sideMenu.classList.remove("active");
+      overlay.classList.remove("active");
+    });
+  }
+});
