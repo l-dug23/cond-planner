@@ -289,39 +289,74 @@ if (zoneDiv) zoneDiv.innerHTML = zoneHtml;
     return "#9e9e9e";
   }
 
-  // Parse helper: time + @ % OR absolute W OR range W
-  function parseCycleInterval(str, base) {
-    // Section label
-    let m = str.match(/(.+)\s*>>/i);
-    if (m) return { section: m[1].trim() };
+ // Parse helper: time + @ % OR absolute W OR range W OR range % OR ramps
+function parseCycleInterval(str, base) {
+  // Section label e.g., "Warm-up >>"
+  let m = str.match(/(.+)\s*>>/i);
+  if (m) return { section: m[1].trim() };
 
-    // % (of base)
-    m = str.match(/(?:(\d+)min)?\s*(?:(\d+)sec)?\s*@\s*(\d+)%/i);
-    if (m) {
-      const dur = (parseInt(m[1] || 0, 10) * 60) + (parseInt(m[2] || 0, 10));
-      const pct = parseInt(m[3], 10) / 100;
-      return { dur, power: base * pct };
-    }
+  // --- RAMP up/down ---
+// Works with or without '@' (e.g., "10min ramp down @60-50%")
+m = str.match(/(?:(\d+)min)?\s*(?:(\d+)sec)?\s*ramp\s*(up|down)\s*@?\s*(\d+)\s*-\s*(\d+)\s*(%|w)/i);
+if (m) {
+  const dur  = (parseInt(m[1] || 0,10) * 60) + (parseInt(m[2] || 0,10));
+  const v1   = parseInt(m[4],10);
+  const v2   = parseInt(m[5],10);
+  const unit = m[6];
 
-    // absolute watts
-    m = str.match(/(?:(\d+)min)?\s*(?:(\d+)sec)?\s*@\s*(\d+)\s*w/i);
-    if (m) {
-      const dur = (parseInt(m[1] || 0, 10) * 60) + (parseInt(m[2] || 0, 10));
-      const power = parseInt(m[3], 10);
-      return { dur, power };
-    }
+  // interpret first value as start, second as end
+  const start = (unit === "%") ? base * (v1/100) : v1;
+  const end   = (unit === "%") ? base * (v2/100) : v2;
 
-    // watt range "low-high w"
-    m = str.match(/(?:(\d+)min)?\s*(?:(\d+)sec)?\s*@\s*(\d+)\s*-\s*(\d+)\s*w/i);
-    if (m) {
-      const dur = (parseInt(m[1] || 0, 10) * 60) + (parseInt(m[2] || 0, 10));
-      const low = parseInt(m[3], 10);
-      const high = parseInt(m[4], 10);
-      return { dur, power: (low + high) / 2, low, high };
-    }
+  return {
+    dur,
+    ramp: true,                 // boolean flag
+    start,                      // start watts
+    end,                        // end watts
+    low: Math.min(start, end),  // for band shading + labels
+    high: Math.max(start, end),
+    power: (start + end) / 2    // average as representative value
+  };
+}
 
-    return null;
+
+  // --- percent range "low-high %" ---
+  // "10min @ 70-90%"  (uses chosen base: CP or FTP)
+  m = str.match(/(?:(\d+)min)?\s*(?:(\d+)sec)?\s*@\s*(\d+)\s*-\s*(\d+)\s*%/i);
+  if (m) {
+    const dur    = (parseInt(m[1] || 0,10) * 60) + (parseInt(m[2] || 0,10));
+    const lowPct = parseInt(m[3],10)/100, highPct = parseInt(m[4],10)/100;
+    const low = base*lowPct, high = base*highPct;
+    return { dur, power: (low+high)/2, low, high };
   }
+
+  // --- absolute watt range "low-high w" ---
+  m = str.match(/(?:(\d+)min)?\s*(?:(\d+)sec)?\s*@\s*(\d+)\s*-\s*(\d+)\s*w/i);
+  if (m) {
+    const dur = (parseInt(m[1] || 0,10) * 60) + (parseInt(m[2] || 0,10));
+    const low = parseInt(m[3],10), high = parseInt(m[4],10);
+    return { dur, power: (low+high)/2, low, high };
+  }
+
+  // --- single % ---
+  m = str.match(/(?:(\d+)min)?\s*(?:(\d+)sec)?\s*@\s*(\d+)\s*%/i);
+  if (m) {
+    const dur = (parseInt(m[1] || 0,10) * 60) + (parseInt(m[2] || 0,10));
+    const pct = parseInt(m[3],10)/100;
+    return { dur, power: base * pct };
+  }
+
+  // --- single absolute watts ---
+  m = str.match(/(?:(\d+)min)?\s*(?:(\d+)sec)?\s*@\s*(\d+)\s*w/i);
+  if (m) {
+    const dur = (parseInt(m[1] || 0,10) * 60) + (parseInt(m[2] || 0,10));
+    const power = parseInt(m[3],10);
+    return { dur, power };
+  }
+
+  return null;
+}
+
 
   function updateCycleMetrics(powerSeries, cp) {
     const ap = App.avg(powerSeries);
@@ -393,48 +428,76 @@ if (zoneDiv) zoneDiv.innerHTML = zoneHtml;
       let powerSeries = [];
       let cursor = 0;
 
-      intervals.forEach((iv) => {
-        for (let i = 0; i < iv.dur; i++) {
-          const tSec = cursor + i + 1;
-          const tMin = tSec / 60;
-          powerPoints.push({ x: tMin, y: iv.power, c: getZoneColor(iv.power, CP) });
-          powerSeries.push(iv.power);
+intervals.forEach((iv) => {
+  for (let i = 0; i < iv.dur; i++) {
+    const tSec = cursor + i + 1;
+    const tMin = tSec / 60;
 
-          // crude W'bal: deplete above CP, recover below CP with simple exp term
-          if (iv.power > CP) {
-            wpbal -= (iv.power - CP) * dt;
-          } else {
-            // Simple bounded recovery
-            wpbal += (CP - iv.power) * dt * (1 - wpbal / (WPRIME || 1));
-          }
-          wpbal = Math.max(0, Math.min(wpbal, WPRIME || 0));
-          wbalPoints.push({ x: tMin, y: wpbal });
-        }
-        cursor += iv.dur;
-      });
+  let p = iv.power;
+if (iv.ramp) {
+  const frac = i / Math.max(1, iv.dur - 1);
+  p = iv.start + (iv.end - iv.start) * frac;  // interpolate start→end
+}
 
-      // annotations (sections + ranges)
-      const annotations = {};
-      intervals.reduce((acc, iv, idx) => {
-        // draw watt range band
-        if (iv.low && iv.high) {
-          const startMin = acc / 60;
-          const endMin = (acc + iv.dur) / 60;
-          annotations["rng" + idx] = {
-            type: "box",
-            xScaleID: "x",
-            yScaleID: "y1",
-            xMin: startMin,
-            xMax: endMin,
-            yMin: iv.low,
-            yMax: iv.high,
-            backgroundColor: "rgba(30,144,255,0.18)",
-            borderWidth: 0,
-            drawTime: "beforeDatasetsDraw",
-          };
-        }
-        return acc + iv.dur;
-      }, 0);
+    powerPoints.push({ x: tMin, y: p, c: getZoneColor(p, CP) });
+    powerSeries.push(p);
+
+    // --- crude W′bal ---
+    if (p > CP) wpbal -= (p - CP) * dt;
+    else {
+      wpbal += (CP - p) * dt * (1 - wpbal / (WPRIME || 1));
+    }
+    wpbal = Math.max(0, Math.min(wpbal, WPRIME || 0));
+    wbalPoints.push({ x: tMin, y: wpbal });
+  }
+  cursor += iv.dur;
+});
+
+
+// annotations (sections + ranges)
+const annotations = {};
+
+// Ranges: add translucent band + label
+intervals.reduce((acc, iv, idx) => {
+  if (iv.low && iv.high) {
+    const startMin = acc / 60;
+    const endMin   = (acc + iv.dur) / 60;
+    const avgP     = (iv.low + iv.high) / 2;
+    const color    = getZoneColor(avgP, CP); // hex like #e68264ff
+
+    // turn '#rrggbbaa' → rgba(r,g,b,alpha)
+    const rgba = (hex, a=0.25) => {
+      const h = hex.replace('#','');
+      const r = parseInt(h.slice(0,2),16);
+      const g = parseInt(h.slice(2,4),16);
+      const b = parseInt(h.slice(4,6),16);
+      return `rgba(${r},${g},${b},${a})`;
+    };
+
+    annotations["rng"+idx] = {
+      type: "box",
+      xScaleID: "x",
+      yScaleID: "y1",
+      xMin: startMin,
+      xMax: endMin,
+      yMin: iv.low,
+      yMax: iv.high,
+      backgroundColor: rgba(color, 0.28),  // ← more opaque than before
+      borderWidth: 0,
+      drawTime: "beforeDatasetsDraw",
+      label: {
+        display: true,
+        content: `${Math.round(iv.low)}–${Math.round(iv.high)} W`,
+        position: "center",
+        backgroundColor: "rgba(255,255,255,0.85)",
+        color: "#000",
+        font: { size: 11, weight: "bold" },
+        xAdjust: 0, yAdjust: 0,
+      }
+    };
+  }
+  return acc + iv.dur;
+}, 0);
 
       // --- Section background + labels (Warm-up, Main Set, Cool Down)
 sections.forEach((s, i) => {
@@ -506,13 +569,27 @@ sections.forEach((s, i) => {
       padding: { top: 30 } // ensures header labels aren’t clipped
     },
 
-    plugins: {
+plugins: {
+  tooltip: {
+    callbacks: {
+      label: (ctx) => {
+        // For each bar point: show watts
+        const p = ctx.raw?.y;
+        if (!p) return '';
+        return `Power: ${Math.round(p)} W`;
+      },
+      afterBody: (items) => {
+        // Add extra text below tooltip body (if needed)
+        // For now, it just returns empty (we can later link this to ramp info)
+        return '';
+      }
+    }
+  },
+
+  // Keep your annotations and legend exactly as before
   annotation: {
     annotations: {
-      // Existing section boxes (reuse parsed sections)
       ...annotations,
-
-      // Add a dotted CP reference line
       cpLine: {
         type: "line",
         yScaleID: "y1",
@@ -535,6 +612,7 @@ sections.forEach((s, i) => {
   },
   legend: { position: "top" },
 },
+
 
 
     scales: {
