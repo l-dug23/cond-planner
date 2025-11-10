@@ -1986,7 +1986,7 @@ document.addEventListener("DOMContentLoaded", () => {
   if (navButton && sideMenu && overlay) {
     navButton.addEventListener("click", () => {
       sideMenu.classList.toggle("active");
-      overlay.classList.toggle("active");
+      overlay.classList.toggle("active"); 
     });
 
     overlay.addEventListener("click", () => {
